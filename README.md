@@ -1,6 +1,6 @@
-# Welcome to your CDK Java project!
+# Welcome to ReCiter-CDK Java project!
 
-This is a blank project for Java development with CDK.
+This project builds all cloud infrastructure in AWS using CDK(Cloud Development Kit). The project creates necessary roles, permissions, ECR repository, VPC, ECS services, RDS etc.
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.
 
