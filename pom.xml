@@ -43,6 +43,11 @@
             <artifactId>core</artifactId>
             <version>${cdk.version}</version>
         </dependency>
+        <dependency>
+            <groupId>software.amazon.awscdk</groupId>
+            <artifactId>ecr</artifactId>
+            <version>${cdk.version}</version>
+        </dependency>
 
         <dependency>
           <groupId>org.junit.jupiter</groupId>
