@@ -1,4 +1,4 @@
-package com.myorg;
+package edu.wcm.reciter;
 
 import software.amazon.awscdk.core.App;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -8,6 +8,9 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
+
+import edu.wcm.reciter.ReCiterCdkStack;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class ReCiterCdkTest {
