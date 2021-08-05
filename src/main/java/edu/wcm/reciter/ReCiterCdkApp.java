@@ -7,8 +7,20 @@ import software.amazon.awscdk.core.StackProps;
 import java.util.Arrays;
 
 public class ReCiterCdkApp {
+
+    // Helper method to build an environment
+    static Environment makeEnv(String account, String region) {
+        account = (account == null) ? System.getenv("CDK_DEFAULT_ACCOUNT") : account;
+        region = (region == null) ? System.getenv("CDK_DEFAULT_REGION") : region;
+
+        return Environment.builder()
+                .account(account)
+                .region(region)
+                .build();
+    }
     public static void main(final String[] args) {
         App app = new App();
+        Environment envReCiter = makeEnv(null, "us-east-2");
 
         new ReCiterCdkStack(app, "ReCiterCdkStack", StackProps.builder()
                 // If you don't specify 'env', this stack will be environment-agnostic.
@@ -17,7 +29,7 @@ public class ReCiterCdkApp {
 
                 // Uncomment the next block to specialize this stack for the AWS Account
                 // and Region that are implied by the current CLI configuration.
-                /*
+               /*
                 .env(Environment.builder()
                         .account(System.getenv("CDK_DEFAULT_ACCOUNT"))
                         .region(System.getenv("CDK_DEFAULT_REGION"))
@@ -34,6 +46,7 @@ public class ReCiterCdkApp {
                 */
 
                 // For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html
+                .env(envReCiter)
                 .build());
 
         app.synth();
