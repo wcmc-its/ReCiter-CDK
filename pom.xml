@@ -40,11 +40,6 @@
         <!-- AWS Cloud Development Kit -->
         <dependency>
             <groupId>software.amazon.awscdk</groupId>
-            <artifactId>ec2</artifactId>
-            <version>${cdk.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>software.amazon.awscdk</groupId>
             <artifactId>core</artifactId>
             <version>${cdk.version}</version>
         </dependency>
@@ -56,6 +51,36 @@
         <dependency>
             <groupId>software.amazon.awscdk</groupId>
             <artifactId>rds</artifactId>
+            <version>${cdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awscdk</groupId>
+            <artifactId>ec2</artifactId>
+            <version>${cdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awscdk</groupId>
+            <artifactId>ecs</artifactId>
+            <version>${cdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awscdk</groupId>
+            <artifactId>cloudwatch</artifactId>
+            <version>${cdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awscdk</groupId>
+            <artifactId>cloudwatch-actions</artifactId>
+            <version>${cdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awscdk</groupId>
+            <artifactId>wafv2</artifactId>
+            <version>${cdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awscdk</groupId>
+            <artifactId>sns</artifactId>
             <version>${cdk.version}</version>
         </dependency>
 
