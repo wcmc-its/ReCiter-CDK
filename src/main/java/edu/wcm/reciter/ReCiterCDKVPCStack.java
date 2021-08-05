@@ -14,6 +14,7 @@ import software.amazon.awscdk.core.Tags;
 import software.amazon.awscdk.services.ec2.FlowLogDestination;
 import software.amazon.awscdk.services.ec2.FlowLogOptions;
 import software.amazon.awscdk.services.ec2.FlowLogTrafficType;
+import software.amazon.awscdk.services.ec2.IVpc;
 import software.amazon.awscdk.services.ec2.NatProvider;
 import software.amazon.awscdk.services.ec2.SubnetConfiguration;
 import software.amazon.awscdk.services.ec2.SubnetSelection;
@@ -27,6 +28,8 @@ import software.amazon.awscdk.services.rds.SubnetGroup;
 import software.amazon.awscdk.services.rds.SubnetGroupProps;
 
 public class ReCiterCDKVPCStack extends NestedStack {
+
+    private final IVpc reciterVpc;
     
     public ReCiterCDKVPCStack(final Construct parent, final String id) {
         this(parent, id, null);
@@ -36,7 +39,7 @@ public class ReCiterCDKVPCStack extends NestedStack {
         super(parent, id, props);
 
         //ReCiter VPC
-        final Vpc reciterVpc = new Vpc(this, "reciterVpc", VpcProps.builder()
+        this.reciterVpc = new Vpc(this, "reciterVpc", VpcProps.builder()
             .cidr("10.0.0.0/16")
             .natGateways(2)
             .maxAzs(2)
@@ -113,5 +116,9 @@ public class ReCiterCDKVPCStack extends NestedStack {
             .exportName("vpcPrivateSubnetGroup")
             .value(privateSubnetGroup.getSubnetGroupName())
             .build();
+    }
+
+    public IVpc getVpc() {
+        return this.reciterVpc;
     }
 }
