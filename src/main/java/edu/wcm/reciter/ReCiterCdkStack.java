@@ -13,7 +13,10 @@ public class ReCiterCdkStack extends Stack {
     public ReCiterCdkStack(final Construct scope, final String id, final StackProps props) {
         super(scope, id, props);
 
+        ReCiterCDKVPCStack reCiterCDKVPCStack = new ReCiterCDKVPCStack(this, "reCiterCDKVPCStack");
+
         ReCiterCDKECRStack reCiterCDKECRStack = new ReCiterCDKECRStack(this, "reCiterCDKECRStack");
         NestedStack.isNestedStack(reCiterCDKECRStack);
+        reCiterCDKECRStack.addDependency(reCiterCDKVPCStack, "This is dependent on VPC Resources being created");
     }
 }
