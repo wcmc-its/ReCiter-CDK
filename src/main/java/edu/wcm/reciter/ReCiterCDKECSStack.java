@@ -1,6 +1,7 @@
 package edu.wcm.reciter;
 
 import java.util.Arrays;
+import java.util.HashMap;
 
 import software.amazon.awscdk.core.CfnOutput;
 import software.amazon.awscdk.core.Construct;
@@ -39,6 +40,7 @@ import software.amazon.awscdk.services.ecs.MemoryUtilizationScalingProps;
 import software.amazon.awscdk.services.ecs.PortMapping;
 import software.amazon.awscdk.services.ecs.PropagatedTagSource;
 import software.amazon.awscdk.services.ecs.Protocol;
+import software.amazon.awscdk.services.ecs.Secret;
 import software.amazon.awscdk.services.ecs.ScalableTaskCount;
 import software.amazon.awscdk.services.elasticloadbalancingv2.AddApplicationActionProps;
 import software.amazon.awscdk.services.elasticloadbalancingv2.AddApplicationTargetGroupsProps;
@@ -57,6 +59,7 @@ import software.amazon.awscdk.services.elasticloadbalancingv2.RedirectOptions;
 import software.amazon.awscdk.services.logs.LogGroup;
 import software.amazon.awscdk.services.logs.LogGroupProps;
 import software.amazon.awscdk.services.logs.RetentionDays;
+import software.amazon.awscdk.services.secretsmanager.ISecret;
 import software.amazon.awscdk.services.sns.Subscription;
 import software.amazon.awscdk.services.sns.SubscriptionProps;
 import software.amazon.awscdk.services.sns.SubscriptionProtocol;
@@ -68,10 +71,10 @@ public class ReCiterCDKECSStack extends NestedStack {
     private final ApplicationLoadBalancer reCiterEcsALB;
     
     public ReCiterCDKECSStack(final Construct parent, final String id) {
-        this(parent, id, null, null);
+        this(parent, id, null, null, null, null, null);
     }
 
-    public ReCiterCDKECSStack(final Construct parent, final String id, final NestedStackProps props, IVpc vpc) {
+    public ReCiterCDKECSStack(final Construct parent, final String id, final NestedStackProps props, IVpc vpc, ISecret reCiterSecret, ISecret reciterPubmedSecret, ISecret reciterScopusSecret) {
         super(parent, id, props);
 
         final SecurityGroup albSg = new SecurityGroup(this, "reciter-cdk-alb-sg", SecurityGroupProps.builder().allowAllOutbound(true)
@@ -124,7 +127,7 @@ public class ReCiterCDKECSStack extends NestedStack {
 
         
         ContainerDefinition reCiterContainer = reCiterTaskDefinition.addContainer("reCiterContainer", ContainerDefinitionProps.builder()
-            .image(ContainerImage.fromRegistry("httpd:2.4"))
+            .image(ContainerImage.fromRegistry("httpd:latest"))
             .logging(new AwsLogDriver(AwsLogDriverProps.builder()
                 .logGroup(new LogGroup(this, "reciterLogGroup", LogGroupProps.builder()
                     .logGroupName("/ecs/reciter")
@@ -143,6 +146,18 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .build())
             .memoryReservationMiB(1800)
             .memoryLimitMiB(2048)
+            .environment(new HashMap(){{
+                put("PUBMED_SERVICE", reCiterEcsALB.getLoadBalancerDnsName() + "/pubmed");
+                put("SCOPUS_SERVICE", reCiterEcsALB.getLoadBalancerDnsName() + "/scopus");
+            }})
+            .secrets(new HashMap(){{
+                put("AMAZON_AWS_ACCESS_KEY", Secret.fromSecretsManager(reCiterSecret, "AMAZON_AWS_ACCESS_KEY"));
+                put("AMAZON_AWS_SECRET_KEY", Secret.fromSecretsManager(reCiterSecret, "AMAZON_AWS_SECRET_KEY"));
+                put("ADMIN_API_KEY", Secret.fromSecretsManager(reCiterSecret, "ADMIN_API_KEY"));
+                put("CONSUMER_API_KEY", Secret.fromSecretsManager(reCiterSecret, "AMAZON_AWS_SECRET_KEY"));
+                put("AWS_REGION", Secret.fromSecretsManager(reCiterSecret, "AWS_REGION"));
+                put("SERVER_PORT", Secret.fromSecretsManager(reCiterSecret, "SERVER_PORT"));
+            }})
             .taskDefinition(reCiterTaskDefinition)
             .cpu(1024)
             .build());
@@ -152,7 +167,6 @@ public class ReCiterCDKECSStack extends NestedStack {
             .hostPort(80)
             .protocol(Protocol.TCP)
             .build());
-
         
         FargateService reCiterService = new FargateService(this, "reCiterFargateService", FargateServiceProps.builder()
             .cluster(reCiterCluster)
@@ -181,7 +195,7 @@ public class ReCiterCDKECSStack extends NestedStack {
 
         
         ContainerDefinition reCiterPubmedContainer = reCiterPubmedTaskDefinition.addContainer("reCiterPubmedContainer", ContainerDefinitionProps.builder()
-            .image(ContainerImage.fromRegistry("httpd:2.4"))
+            .image(ContainerImage.fromRegistry("httpd:latest"))
             .logging(new AwsLogDriver(AwsLogDriverProps.builder()
                 .logGroup(new LogGroup(this, "reciterPubmedLogGroup", LogGroupProps.builder()
                     .logGroupName("/ecs/reciter/pubmed")
@@ -199,6 +213,9 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .timeout(Duration.seconds(30))
                 .build())
             .memoryReservationMiB(1800)
+            .secrets(new HashMap(){{
+                put("PUBMED_API_KEY", Secret.fromSecretsManager(reciterPubmedSecret, "PUBMED_API_KEY"));
+            }})
             .memoryLimitMiB(2048)
             .taskDefinition(reCiterPubmedTaskDefinition)
             .cpu(1024)
@@ -238,7 +255,7 @@ public class ReCiterCDKECSStack extends NestedStack {
 
         
         ContainerDefinition reCiterScopusContainer = reCiterScopusTaskDefinition.addContainer("reCiterScopusContainer", ContainerDefinitionProps.builder()
-            .image(ContainerImage.fromRegistry("httpd:2.4"))
+            .image(ContainerImage.fromRegistry("httpd:latest"))
             .logging(new AwsLogDriver(AwsLogDriverProps.builder()
                 .logGroup(new LogGroup(this, "reciterScopusLogGroup", LogGroupProps.builder()
                     .logGroupName("/ecs/reciter/scopus")
@@ -256,6 +273,10 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .timeout(Duration.seconds(30))
                 .build())
             .memoryReservationMiB(1800)
+            .secrets(new HashMap(){{
+                put("SCOPUS_API_KEY", Secret.fromSecretsManager(reciterScopusSecret, "SCOPUS_API_KEY"));
+                put("SCOPUS_INST_TOKEN", Secret.fromSecretsManager(reciterScopusSecret, "SCOPUS_INST_TOKEN"));
+            }})
             .memoryLimitMiB(2048)
             .taskDefinition(reCiterScopusTaskDefinition)
             .cpu(1024)
@@ -295,7 +316,7 @@ public class ReCiterCDKECSStack extends NestedStack {
 
         
         ContainerDefinition reCiterPubManagerContainer = reCiterPubManagerTaskDefinition.addContainer("reCiterScopusContainer", ContainerDefinitionProps.builder()
-            .image(ContainerImage.fromRegistry("httpd:2.4"))
+            .image(ContainerImage.fromRegistry("httpd:latest"))
             .logging(new AwsLogDriver(AwsLogDriverProps.builder()
                 .logGroup(new LogGroup(this, "reciterPubManagerLogGroup", LogGroupProps.builder()
                     .logGroupName("/ecs/reciter/pub/manager")
