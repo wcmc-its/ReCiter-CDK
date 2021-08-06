@@ -1,10 +1,10 @@
 package edu.wcm.reciter;
 
+import java.util.HashMap;
+
 import software.amazon.awscdk.core.App;
 import software.amazon.awscdk.core.Environment;
 import software.amazon.awscdk.core.StackProps;
-
-import java.util.Arrays;
 
 public class ReCiterCdkApp {
 
@@ -46,6 +46,14 @@ public class ReCiterCdkApp {
                 */
 
                 // For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html
+                .analyticsReporting(true)
+                .description("This stack is the master stack that will build VPC, ECR, ECS, WAF, SecretsManager, CodePipeline, Codebuild for ReCiter and its components.")
+                .terminationProtection(true)
+                .stackName("ReCiterCdkMasterStack")
+                .tags(new HashMap(){{
+                        put("application", "ReCiter");
+                        put("cdk-maintianer", "Sarbajit Dutta - szd2013@med.cornell.edu");
+                }})
                 .env(envReCiter)
                 .build());
 
