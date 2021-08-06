@@ -1,5 +1,7 @@
 package edu.wcm.reciter;
 
+import org.json.JSONObject;
+
 import software.amazon.awscdk.core.CfnOutput;
 import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.Duration;
@@ -57,16 +59,17 @@ public class ReCiterCdkRDSStack extends NestedStack {
             .preferredBackupWindow("01:00-02:00")
             .preferredMaintenanceWindow("Sat:03:00-Sat:05:00")
             .credentials(Credentials.fromSecret(Secret.Builder.create(this, "reciter-report-secret")
-                .description("This secret houses database credentials for reciter-report-db")
-                .generateSecretString(SecretStringGenerator.builder()
-                    .generateStringKey("password")
-                    .secretStringTemplate("{\"username\":\"admin\",\"password\":\"\"}")
-                    .excludeNumbers(false)
-                    .passwordLength(10)
-                    .build())
-                .removalPolicy(RemovalPolicy.DESTROY)
-                .secretName("reciter-report-secret")
-                .build()))
+            .description("This secret houses database credentials for reciter-report-db")
+            .generateSecretString(SecretStringGenerator.builder()
+                .generateStringKey("password")
+                .secretStringTemplate(new JSONObject()
+                    .put("username", "admin") 
+                    .put("password", "")
+                    .toString())
+                .build())
+            .removalPolicy(RemovalPolicy.DESTROY)
+            .secretName("reciter-report-secret")
+            .build()))
             .build());
             
         //Tagging for all Resources
