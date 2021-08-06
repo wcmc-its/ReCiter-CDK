@@ -30,6 +30,7 @@ import software.amazon.awscdk.services.rds.SubnetGroupProps;
 public class ReCiterCDKVPCStack extends NestedStack {
 
     private final IVpc reciterVpc;
+    private final SubnetGroup privateSubnetGroup;
     
     public ReCiterCDKVPCStack(final Construct parent, final String id) {
         this(parent, id, null);
@@ -62,7 +63,7 @@ public class ReCiterCDKVPCStack extends NestedStack {
             .natGatewaySubnets(SubnetSelection.builder().onePerAz(true).subnetType(SubnetType.PUBLIC).build())
             .build());
 
-        final SubnetGroup privateSubnetGroup = new SubnetGroup(this, "privateSubnetGroup", SubnetGroupProps.builder()
+        privateSubnetGroup = new SubnetGroup(this, "privateSubnetGroup", SubnetGroupProps.builder()
             .description("This subnet group is for private subnets in ReCiter VPC")
             .removalPolicy(RemovalPolicy.DESTROY)
             .subnetGroupName("reciter-private-subnet-group")
@@ -120,5 +121,9 @@ public class ReCiterCDKVPCStack extends NestedStack {
 
     public IVpc getVpc() {
         return this.reciterVpc;
+    }
+
+    public SubnetGroup getPrivateSubnetGroup() {
+        return this.privateSubnetGroup;
     }
 }
