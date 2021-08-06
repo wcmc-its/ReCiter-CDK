@@ -39,6 +39,11 @@ public class ReCiterCdkStack extends Stack {
             reCiterCDKECSStack.getAlb());
         NestedStack.isNestedStack(reCiterCdkWAFStack);
         reCiterCdkWAFStack.addDependency(reCiterCDKECSStack, "WAF dependent on ALB");
-        
+
+        ReCiterCdkRDSStack reCiterCdkRDSStack = new ReCiterCdkRDSStack(this, "reCiterCdkRDSStack", NestedStackProps.builder()
+            .removalPolicy(RemovalPolicy.DESTROY)
+            .build(), 
+            reCiterCDKVPCStack.getVpc(), reCiterCDKVPCStack.getPrivateSubnetGroup());
+        reCiterCdkRDSStack.addDependency(reCiterCDKVPCStack, "RDS is dependent on VPC");
     }
 }
