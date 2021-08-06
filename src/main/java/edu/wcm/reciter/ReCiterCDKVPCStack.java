@@ -53,7 +53,7 @@ public class ReCiterCDKVPCStack extends NestedStack {
                     .trafficType(FlowLogTrafficType.ALL)
                     .destination(FlowLogDestination.toCloudWatchLogs(new LogGroup(parent, "reciterVpcFlowLogs", LogGroupProps.builder()
                         .logGroupName("reciter-vpc-flowlogs")
-                        .removalPolicy(RemovalPolicy.DESTROY)
+                        .removalPolicy(RemovalPolicy.RETAIN)
                         .retention(RetentionDays.ONE_MONTH)
                         .build())))
                     .build());
