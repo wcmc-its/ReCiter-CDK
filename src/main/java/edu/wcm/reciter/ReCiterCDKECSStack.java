@@ -540,7 +540,7 @@ public class ReCiterCDKECSStack extends NestedStack {
             .displayName("reciter-monitor-topic")
             .build());
         
-        Subscription subscription = new Subscription(this, "emailSub", SubscriptionProps.builder()
+        new Subscription(this, "emailSub", SubscriptionProps.builder()
             .protocol(SubscriptionProtocol.EMAIL)
             .region(this.getRegion())
             .topic(reciterAlarmTopic)
