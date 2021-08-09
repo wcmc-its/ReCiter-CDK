@@ -22,6 +22,7 @@ import software.amazon.awscdk.services.ec2.SecurityGroup;
 import software.amazon.awscdk.services.ec2.SecurityGroupProps;
 import software.amazon.awscdk.services.ec2.SubnetSelection;
 import software.amazon.awscdk.services.ec2.SubnetType;
+import software.amazon.awscdk.services.ecr.Repository;
 import software.amazon.awscdk.services.ecs.AwsLogDriver;
 import software.amazon.awscdk.services.ecs.AwsLogDriverProps;
 import software.amazon.awscdk.services.ecs.Cluster;
@@ -40,22 +41,24 @@ import software.amazon.awscdk.services.ecs.MemoryUtilizationScalingProps;
 import software.amazon.awscdk.services.ecs.PortMapping;
 import software.amazon.awscdk.services.ecs.PropagatedTagSource;
 import software.amazon.awscdk.services.ecs.Protocol;
-import software.amazon.awscdk.services.ecs.Secret;
 import software.amazon.awscdk.services.ecs.ScalableTaskCount;
+import software.amazon.awscdk.services.ecs.Secret;
 import software.amazon.awscdk.services.elasticloadbalancingv2.AddApplicationActionProps;
-import software.amazon.awscdk.services.elasticloadbalancingv2.AddApplicationTargetGroupsProps;
+import software.amazon.awscdk.services.elasticloadbalancingv2.AddApplicationTargetsProps;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationListener;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationLoadBalancer;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationLoadBalancerProps;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationProtocol;
-import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationTargetGroup;
-import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationTargetGroupProps;
+import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationProtocolVersion;
 import software.amazon.awscdk.services.elasticloadbalancingv2.BaseApplicationListenerProps;
 import software.amazon.awscdk.services.elasticloadbalancingv2.FixedResponseOptions;
 import software.amazon.awscdk.services.elasticloadbalancingv2.IpAddressType;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ListenerAction;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ListenerCondition;
 import software.amazon.awscdk.services.elasticloadbalancingv2.RedirectOptions;
+import software.amazon.awscdk.services.iam.Effect;
+import software.amazon.awscdk.services.iam.PolicyStatement;
+import software.amazon.awscdk.services.iam.PolicyStatementProps;
 import software.amazon.awscdk.services.logs.LogGroup;
 import software.amazon.awscdk.services.logs.LogGroupProps;
 import software.amazon.awscdk.services.logs.RetentionDays;
@@ -71,10 +74,10 @@ public class ReCiterCDKECSStack extends NestedStack {
     private final ApplicationLoadBalancer reCiterEcsALB;
     
     public ReCiterCDKECSStack(final Construct parent, final String id) {
-        this(parent, id, null, null, null, null, null);
+        this(parent, id, null, null, null, null, null, null, null, null, null);
     }
 
-    public ReCiterCDKECSStack(final Construct parent, final String id, final NestedStackProps props, IVpc vpc, ISecret reCiterSecret, ISecret reciterPubmedSecret, ISecret reciterScopusSecret) {
+    public ReCiterCDKECSStack(final Construct parent, final String id, final NestedStackProps props, IVpc vpc, ISecret reCiterSecret, ISecret reciterPubmedSecret, ISecret reciterScopusSecret, Repository reCiterEcrRepo, Repository reCiterPubmedEcrRep, Repository reCiterScopusEcrRepo, Repository reCiterPubManagerEcrRepo) {
         super(parent, id, props);
 
         final SecurityGroup albSg = new SecurityGroup(this, "reciter-cdk-alb-sg", SecurityGroupProps.builder().allowAllOutbound(true)
@@ -125,9 +128,50 @@ public class ReCiterCDKECSStack extends NestedStack {
             .memoryLimitMiB(2048)
             .build());
 
+        reCiterTaskDefinition.addToTaskRolePolicy(new PolicyStatement(PolicyStatementProps.builder()
+            .actions(Arrays.asList("dynamodb:*", "s3:*"))
+            .effect(Effect.ALLOW)
+            .resources(Arrays.asList("*"))
+            .sid("DynamoDbS3FullAccess")
+            .build()));
+
+        reCiterTaskDefinition.addToExecutionRolePolicy(new PolicyStatement(PolicyStatementProps.builder()
+            .actions(Arrays.asList("ecr:GetDownloadUrlForLayer",
+                "ecr:BatchGetImage",
+                "ecr:GetAuthorizationToken",
+                "ecr:BatchCheckLayerAvailability"))
+            .effect(Effect.ALLOW)
+            .resources(Arrays.asList(reCiterEcrRepo.getRepositoryArn()))
+            .sid("AccessToPullImage")
+        .build()));
+
+        ContainerDefinition reCiterNginxContainer = reCiterTaskDefinition.addContainer("reCiterNginxContainer", ContainerDefinitionProps.builder()
+            .image(ContainerImage.fromRegistry("wcmcits/reciter-nginx:latest"))
+            .logging(new AwsLogDriver(AwsLogDriverProps.builder()
+                .logGroup(new LogGroup(this, "reciterNginxLogGroup", LogGroupProps.builder()
+                    .logGroupName("/ecs/reciter/nginx")
+                    .removalPolicy(RemovalPolicy.DESTROY)
+                    .retention(RetentionDays.ONE_MONTH)
+                    .build()))
+                .streamPrefix("reciter-logs")
+                .build()))
+            .containerName("reciter-nginx")
+            .healthCheck(HealthCheck.builder()
+                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost/nginx-health || exit 1"))
+                .interval(Duration.minutes(5))
+                .retries(2)
+                .startPeriod(Duration.seconds(60))
+                .timeout(Duration.seconds(30))
+                .build())
+            .memoryReservationMiB(400)
+            .memoryLimitMiB(548)
+            .taskDefinition(reCiterTaskDefinition)
+            .cpu(200)
+            .build());
+
         
         ContainerDefinition reCiterContainer = reCiterTaskDefinition.addContainer("reCiterContainer", ContainerDefinitionProps.builder()
-            .image(ContainerImage.fromRegistry("httpd:latest"))
+            .image(ContainerImage.fromRegistry("wcmcits/reciter:latest"))
             .logging(new AwsLogDriver(AwsLogDriverProps.builder()
                 .logGroup(new LogGroup(this, "reciterLogGroup", LogGroupProps.builder()
                     .logGroupName("/ecs/reciter")
@@ -138,40 +182,56 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .build()))
             .containerName("reciter")
             .healthCheck(HealthCheck.builder()
-                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost || exit 1"))
+                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost/reciter/ping || exit 1"))
                 .interval(Duration.minutes(5))
                 .retries(2)
-                .startPeriod(Duration.seconds(60))
+                .startPeriod(Duration.seconds(120))
                 .timeout(Duration.seconds(30))
                 .build())
-            .memoryReservationMiB(1800)
-            .memoryLimitMiB(2048)
+            .memoryReservationMiB(1500)
+            .memoryLimitMiB(1600)
             .environment(new HashMap(){{
-                put("PUBMED_SERVICE", reCiterEcsALB.getLoadBalancerDnsName() + "/pubmed");
-                put("SCOPUS_SERVICE", reCiterEcsALB.getLoadBalancerDnsName() + "/scopus");
+                put("PUBMED_SERVICE", "http://" + reCiterEcsALB.getLoadBalancerDnsName());
+                put("SCOPUS_SERVICE", "http://" + reCiterEcsALB.getLoadBalancerDnsName());
             }})
             .secrets(new HashMap(){{
-                put("AMAZON_AWS_ACCESS_KEY", Secret.fromSecretsManager(reCiterSecret, "AMAZON_AWS_ACCESS_KEY"));
-                put("AMAZON_AWS_SECRET_KEY", Secret.fromSecretsManager(reCiterSecret, "AMAZON_AWS_SECRET_KEY"));
+                //put("AMAZON_AWS_ACCESS_KEY", Secret.fromSecretsManager(reCiterSecret, "AMAZON_AWS_ACCESS_KEY"));
+                //put("AMAZON_AWS_SECRET_KEY", Secret.fromSecretsManager(reCiterSecret, "AMAZON_AWS_SECRET_KEY"));
                 put("ADMIN_API_KEY", Secret.fromSecretsManager(reCiterSecret, "ADMIN_API_KEY"));
                 put("CONSUMER_API_KEY", Secret.fromSecretsManager(reCiterSecret, "AMAZON_AWS_SECRET_KEY"));
                 put("AWS_REGION", Secret.fromSecretsManager(reCiterSecret, "AWS_REGION"));
                 put("SERVER_PORT", Secret.fromSecretsManager(reCiterSecret, "SERVER_PORT"));
             }})
             .taskDefinition(reCiterTaskDefinition)
-            .cpu(1024)
+            .cpu(824)
             .build());
 
-        reCiterContainer.addPortMappings(PortMapping.builder()
+            
+        
+        reCiterNginxContainer.addPortMappings(PortMapping.builder()
             .containerPort(80)
-            .hostPort(80)
             .protocol(Protocol.TCP)
             .build());
+        reCiterContainer.addPortMappings(PortMapping.builder()
+            .containerPort(5000)
+            .protocol(Protocol.TCP)
+            .build());
+
+        
+
+        final SecurityGroup reciterClusterSg = new SecurityGroup(this, "reciter-cdk-cluster-sg", SecurityGroupProps.builder().allowAllOutbound(true)
+            .description("Allow inbound connection to application from alb")
+            .allowAllOutbound(true)
+            .securityGroupName("reciter-cdk-cluster-sg")
+            .vpc(vpc)
+            .build());
+
+        reciterClusterSg.getConnections().allowFrom(reCiterEcsALB, Port.tcp(80), "Allow reciter ALB TCP connection from Port 5000");
         
         FargateService reCiterService = new FargateService(this, "reCiterFargateService", FargateServiceProps.builder()
             .cluster(reCiterCluster)
             .taskDefinition(reCiterTaskDefinition)
-            .desiredCount(2)
+            .desiredCount(1)
             .serviceName("reciter")
             .assignPublicIp(false)
             .enableEcsManagedTags(true)
@@ -182,20 +242,53 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .onePerAz(true)
                 .subnetType(SubnetType.PRIVATE)
                 .build())
-            .securityGroups(Arrays.asList(albSg))
+            .securityGroups(Arrays.asList(reciterClusterSg))
             .build());
 
         reCiterService.getConnections().allowFrom(reCiterEcsALB, Port.tcp(80), "Connection from ALB over port 80");
-        reCiterEcsALB.getConnections().allowTo(reCiterService, Port.tcp(80), "Connection to Service from ALB over port 80");
 
         final FargateTaskDefinition reCiterPubmedTaskDefinition = new FargateTaskDefinition(this, "reCiterPubmedTaskDefinition", FargateTaskDefinitionProps.builder()
             .cpu(1024)
             .memoryLimitMiB(2048)
             .build());
 
+        reCiterPubmedTaskDefinition.addToExecutionRolePolicy(new PolicyStatement(PolicyStatementProps.builder()
+            .actions(Arrays.asList("ecr:GetDownloadUrlForLayer",
+                "ecr:BatchGetImage",
+                "ecr:GetAuthorizationToken",
+                "ecr:BatchCheckLayerAvailability"))
+            .effect(Effect.ALLOW)
+            .resources(Arrays.asList(reCiterPubmedEcrRep.getRepositoryArn()))
+            .sid("AccessToPullImage")
+        .build()));
+
+        ContainerDefinition reCiterPubmedNginxContainer = reCiterPubmedTaskDefinition.addContainer("reCiterPubmedNginxContainer", ContainerDefinitionProps.builder()
+            .image(ContainerImage.fromRegistry("wcmcits/reciter-pubmed-nginx:latest"))
+            .logging(new AwsLogDriver(AwsLogDriverProps.builder()
+                    .logGroup(new LogGroup(this, "reciterNginxPubmedLogGroup", LogGroupProps.builder()
+                        .logGroupName("/ecs/reciter/pubmed/nginx")
+                        .removalPolicy(RemovalPolicy.DESTROY)
+                        .retention(RetentionDays.ONE_MONTH)
+                        .build()))
+                    .streamPrefix("pubmed-logs")
+                    .build()))
+            .containerName("reciter-pubmed-nginx")
+            .healthCheck(HealthCheck.builder()
+                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost/nginx-health || exit 1"))
+                .interval(Duration.minutes(5))
+                .retries(2)
+                .startPeriod(Duration.seconds(60))
+                .timeout(Duration.seconds(30))
+                .build())
+            .memoryReservationMiB(400)
+            .memoryLimitMiB(548)
+            .taskDefinition(reCiterPubmedTaskDefinition)
+            .cpu(200)
+            .build());
+
         
         ContainerDefinition reCiterPubmedContainer = reCiterPubmedTaskDefinition.addContainer("reCiterPubmedContainer", ContainerDefinitionProps.builder()
-            .image(ContainerImage.fromRegistry("httpd:latest"))
+            .image(ContainerImage.fromRegistry("wcmcits/reciter-pubmed:latest"))
             .logging(new AwsLogDriver(AwsLogDriverProps.builder()
                 .logGroup(new LogGroup(this, "reciterPubmedLogGroup", LogGroupProps.builder()
                     .logGroupName("/ecs/reciter/pubmed")
@@ -206,32 +299,35 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .build()))
             .containerName("reciter-pubmed")
             .healthCheck(HealthCheck.builder()
-                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost || exit 1"))
+                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost/pubmed/ping || exit 1"))
                 .interval(Duration.minutes(5))
                 .retries(2)
                 .startPeriod(Duration.seconds(60))
                 .timeout(Duration.seconds(30))
                 .build())
-            .memoryReservationMiB(1800)
+            .memoryReservationMiB(1500)
+            .memoryLimitMiB(1600)
             .secrets(new HashMap(){{
                 put("PUBMED_API_KEY", Secret.fromSecretsManager(reciterPubmedSecret, "PUBMED_API_KEY"));
             }})
-            .memoryLimitMiB(2048)
             .taskDefinition(reCiterPubmedTaskDefinition)
-            .cpu(1024)
+            .cpu(824)
             .build());
 
-        reCiterPubmedContainer.addPortMappings(PortMapping.builder()
+        reCiterPubmedNginxContainer.addPortMappings(PortMapping.builder()
             .containerPort(80)
-            .hostPort(80)
             .protocol(Protocol.TCP)
             .build());
 
+        reCiterPubmedContainer.addPortMappings(PortMapping.builder()
+            .containerPort(5000)
+            .protocol(Protocol.TCP)
+            .build());
         
         FargateService reCiterPubmedService = new FargateService(this, "reCiterPubmedFargateService", FargateServiceProps.builder()
             .cluster(reCiterCluster)
             .taskDefinition(reCiterPubmedTaskDefinition)
-            .desiredCount(2)
+            .desiredCount(1)
             .serviceName("reciter-pubmed")
             .assignPublicIp(false)
             .enableEcsManagedTags(true)
@@ -242,20 +338,52 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .onePerAz(true)
                 .subnetType(SubnetType.PRIVATE)
                 .build())
-            .securityGroups(Arrays.asList(albSg))
+            .securityGroups(Arrays.asList(reciterClusterSg))
             .build());
 
         reCiterPubmedService.getConnections().allowFrom(reCiterEcsALB, Port.tcp(80), "Connection from ALB over port 80");
-        reCiterEcsALB.getConnections().allowTo(reCiterPubmedService, Port.tcp(80), "Connection to Service from ALB over port 80");
        
         final FargateTaskDefinition reCiterScopusTaskDefinition = new FargateTaskDefinition(this, "reCiterScopusTaskDefinition", FargateTaskDefinitionProps.builder()
             .cpu(1024)
             .memoryLimitMiB(2048)
             .build());
 
+        reCiterScopusTaskDefinition.addToExecutionRolePolicy(new PolicyStatement(PolicyStatementProps.builder()
+            .actions(Arrays.asList("ecr:GetDownloadUrlForLayer",
+                "ecr:BatchGetImage",
+                "ecr:GetAuthorizationToken",
+                "ecr:BatchCheckLayerAvailability"))
+            .effect(Effect.ALLOW)
+            .resources(Arrays.asList(reCiterScopusEcrRepo.getRepositoryArn()))
+            .sid("AccessToPullImage")
+            .build()));
+        
+        ContainerDefinition reCiterScopusNginxContainer = reCiterScopusTaskDefinition.addContainer("reCiterScopusNginxContainer", ContainerDefinitionProps.builder()
+            .image(ContainerImage.fromRegistry("wcmcits/reciter-scopus-nginx:latest"))
+            .logging(new AwsLogDriver(AwsLogDriverProps.builder()
+                .logGroup(new LogGroup(this, "reciterNginxScopusLogGroup", LogGroupProps.builder()
+                    .logGroupName("/ecs/reciter/scopus/nginx")
+                    .removalPolicy(RemovalPolicy.DESTROY)
+                    .retention(RetentionDays.ONE_MONTH)
+                    .build()))
+                .streamPrefix("scopus-logs")
+                .build()))
+            .containerName("reciter-scopus-nginx")
+            .healthCheck(HealthCheck.builder()
+                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost/nginx-health || exit 1"))
+                .interval(Duration.minutes(5))
+                .retries(2)
+                .startPeriod(Duration.seconds(60))
+                .timeout(Duration.seconds(30))
+                .build())
+            .memoryReservationMiB(400)
+            .memoryLimitMiB(548)
+            .taskDefinition(reCiterScopusTaskDefinition)
+            .cpu(200)
+            .build());
         
         ContainerDefinition reCiterScopusContainer = reCiterScopusTaskDefinition.addContainer("reCiterScopusContainer", ContainerDefinitionProps.builder()
-            .image(ContainerImage.fromRegistry("httpd:latest"))
+            .image(ContainerImage.fromRegistry("wcmcits/reciter-scopus:latest"))
             .logging(new AwsLogDriver(AwsLogDriverProps.builder()
                 .logGroup(new LogGroup(this, "reciterScopusLogGroup", LogGroupProps.builder()
                     .logGroupName("/ecs/reciter/scopus")
@@ -266,33 +394,39 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .build()))
             .containerName("reciter-scopus")
             .healthCheck(HealthCheck.builder()
-                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost || exit 1"))
+                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost/scopus/ping || exit 1"))
                 .interval(Duration.minutes(5))
                 .retries(2)
                 .startPeriod(Duration.seconds(60))
                 .timeout(Duration.seconds(30))
                 .build())
-            .memoryReservationMiB(1800)
+            .memoryReservationMiB(1500)
+            .memoryLimitMiB(1600)
             .secrets(new HashMap(){{
                 put("SCOPUS_API_KEY", Secret.fromSecretsManager(reciterScopusSecret, "SCOPUS_API_KEY"));
                 put("SCOPUS_INST_TOKEN", Secret.fromSecretsManager(reciterScopusSecret, "SCOPUS_INST_TOKEN"));
             }})
-            .memoryLimitMiB(2048)
             .taskDefinition(reCiterScopusTaskDefinition)
-            .cpu(1024)
+            .cpu(824)
+            .build());
+
+        reCiterScopusNginxContainer.addPortMappings(PortMapping.builder()
+            .containerPort(80)
+            .protocol(Protocol.TCP)
             .build());
 
         reCiterScopusContainer.addPortMappings(PortMapping.builder()
-            .containerPort(80)
-            .hostPort(80)
+            .containerPort(5000)
             .protocol(Protocol.TCP)
             .build());
+
+        
 
         
         FargateService reCiterScopusService = new FargateService(this, "reCiterScopusFargateService", FargateServiceProps.builder()
             .cluster(reCiterCluster)
             .taskDefinition(reCiterScopusTaskDefinition)
-            .desiredCount(2)
+            .desiredCount(1)
             .serviceName("reciter-scopus")
             .assignPublicIp(false)
             .enableEcsManagedTags(true)
@@ -303,16 +437,25 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .onePerAz(true)
                 .subnetType(SubnetType.PRIVATE)
                 .build())
-            .securityGroups(Arrays.asList(albSg))
+            .securityGroups(Arrays.asList(reciterClusterSg))
             .build());
 
         reCiterScopusService.getConnections().allowFrom(reCiterEcsALB, Port.tcp(80), "Connection from ALB over port 80");
-        reCiterEcsALB.getConnections().allowTo(reCiterScopusService, Port.tcp(80), "Connection to Service from ALB over port 80");
 
         final FargateTaskDefinition reCiterPubManagerTaskDefinition = new FargateTaskDefinition(this, "reCiterPubManagerTaskDefinition", FargateTaskDefinitionProps.builder()
             .cpu(1024)
             .memoryLimitMiB(2048)
             .build());
+
+        reCiterPubManagerTaskDefinition.addToExecutionRolePolicy(new PolicyStatement(PolicyStatementProps.builder()
+            .actions(Arrays.asList("ecr:GetDownloadUrlForLayer",
+                "ecr:BatchGetImage",
+                "ecr:GetAuthorizationToken",
+                "ecr:BatchCheckLayerAvailability"))
+            .effect(Effect.ALLOW)
+            .resources(Arrays.asList(reCiterPubManagerEcrRepo.getRepositoryArn()))
+            .sid("AccessToPullImage")
+            .build()));
 
         
         ContainerDefinition reCiterPubManagerContainer = reCiterPubManagerTaskDefinition.addContainer("reCiterScopusContainer", ContainerDefinitionProps.builder()
@@ -326,13 +469,13 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .streamPrefix("pub-manager-logs")
                 .build()))
             .containerName("reciter-pub-manager")
-            .healthCheck(HealthCheck.builder()
+            /*.healthCheck(HealthCheck.builder()
                 .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost || exit 1"))
                 .interval(Duration.minutes(5))
                 .retries(2)
                 .startPeriod(Duration.seconds(60))
                 .timeout(Duration.seconds(30))
-                .build())
+                .build())*/
             .memoryReservationMiB(1800)
             .memoryLimitMiB(2048)
             .taskDefinition(reCiterPubManagerTaskDefinition)
@@ -341,7 +484,6 @@ public class ReCiterCDKECSStack extends NestedStack {
 
         reCiterPubManagerContainer.addPortMappings(PortMapping.builder()
             .containerPort(80)
-            .hostPort(80)
             .protocol(Protocol.TCP)
             .build());
 
@@ -349,7 +491,7 @@ public class ReCiterCDKECSStack extends NestedStack {
         FargateService reCiterPubManagerService = new FargateService(this, "reCiterPubManagerFargateService", FargateServiceProps.builder()
             .cluster(reCiterCluster)
             .taskDefinition(reCiterPubManagerTaskDefinition)
-            .desiredCount(2)
+            .desiredCount(1)
             .serviceName("reciter-pub-manager")
             .assignPublicIp(false)
             .enableEcsManagedTags(true)
@@ -364,75 +506,6 @@ public class ReCiterCDKECSStack extends NestedStack {
             .build());
 
         reCiterPubManagerService.getConnections().allowFrom(reCiterEcsALB, Port.tcp(80), "Connection from ALB over port 80");
-        reCiterEcsALB.getConnections().allowTo(reCiterPubManagerService, Port.tcp(80), "Connection to Service from ALB over port 80");
-
-        ApplicationTargetGroup reciterTg = new ApplicationTargetGroup(this, "reciterTg", ApplicationTargetGroupProps.builder()
-            .targets(Arrays.asList(reCiterService))
-            .port(80)
-            .targetGroupName("cdk-reciter-tg")
-            .healthCheck(software.amazon.awscdk.services.elasticloadbalancingv2.HealthCheck.builder()
-                .enabled(true)
-                .healthyThresholdCount(3)
-                .interval(Duration.seconds(60))
-                .path("/")
-                .port("80")
-                .protocol(software.amazon.awscdk.services.elasticloadbalancingv2.Protocol.HTTP)
-                .unhealthyThresholdCount(3)
-                .build())
-            .protocol(ApplicationProtocol.HTTP)
-            .vpc(vpc)
-            .build());
-
-        ApplicationTargetGroup reciterPubmedTg = new ApplicationTargetGroup(this, "reciterPubmedTg", ApplicationTargetGroupProps.builder()
-            .targets(Arrays.asList(reCiterPubmedService))
-            .port(80)
-            .targetGroupName("cdk-reciter-pubmed-tg")
-            .healthCheck(software.amazon.awscdk.services.elasticloadbalancingv2.HealthCheck.builder()
-                .enabled(true)
-                .healthyThresholdCount(3)
-                .interval(Duration.seconds(60))
-                .path("/")
-                .port("80")
-                .protocol(software.amazon.awscdk.services.elasticloadbalancingv2.Protocol.HTTP)
-                .unhealthyThresholdCount(3)
-                .build())
-            .protocol(ApplicationProtocol.HTTP)
-            .vpc(vpc)
-            .build());
-
-        ApplicationTargetGroup reciterScopusTg = new ApplicationTargetGroup(this, "reciterScopusTg", ApplicationTargetGroupProps.builder()
-            .targets(Arrays.asList(reCiterScopusService))
-            .port(80)
-            .targetGroupName("cdk-reciter-scopus-tg")
-            .healthCheck(software.amazon.awscdk.services.elasticloadbalancingv2.HealthCheck.builder()
-                .enabled(true)
-                .healthyThresholdCount(3)
-                .interval(Duration.seconds(60))
-                .path("/")
-                .port("80")
-                .protocol(software.amazon.awscdk.services.elasticloadbalancingv2.Protocol.HTTP)
-                .unhealthyThresholdCount(3)
-                .build())
-            .protocol(ApplicationProtocol.HTTP)
-            .vpc(vpc)
-            .build());
-
-        ApplicationTargetGroup reciterPubManagerTg = new ApplicationTargetGroup(this, "reciterPubManagerTg", ApplicationTargetGroupProps.builder()
-            .targets(Arrays.asList(reCiterPubManagerService))
-            .port(80)
-            .targetGroupName("cdk-reciter-pub-manager-tg")
-            .healthCheck(software.amazon.awscdk.services.elasticloadbalancingv2.HealthCheck.builder()
-                .enabled(true)
-                .healthyThresholdCount(3)
-                .interval(Duration.seconds(60))
-                .path("/")
-                .port("80")
-                .protocol(software.amazon.awscdk.services.elasticloadbalancingv2.Protocol.HTTP)
-                .unhealthyThresholdCount(3)
-                .build())
-            .protocol(ApplicationProtocol.HTTP)
-            .vpc(vpc)
-            .build());
 
         reciterListener.addAction("reciter-redirect-to-swagger", AddApplicationActionProps.builder()
             .conditions(Arrays.asList(ListenerCondition.pathPatterns(Arrays.asList("/reciter"))))
@@ -471,28 +544,76 @@ public class ReCiterCDKECSStack extends NestedStack {
             .build());
 
         //Path based redirect to reciter
-        reciterListener.addTargetGroups("reciter", AddApplicationTargetGroupsProps.builder()
+        reciterListener.addTargets("reciter", AddApplicationTargetsProps.builder()
             .conditions(Arrays.asList(ListenerCondition.pathPatterns(Arrays.asList("/reciter*"))))
             .priority(4)
-            .targetGroups(Arrays.asList(reciterTg))
+            .targets(Arrays.asList(reCiterService))
+            .port(80)
+            .targetGroupName("cdk-reciter-tg")
+            .protocolVersion(ApplicationProtocolVersion.HTTP1)
+            .healthCheck(software.amazon.awscdk.services.elasticloadbalancingv2.HealthCheck.builder()
+                .enabled(true)
+                .healthyThresholdCount(3)
+                .interval(Duration.seconds(60))
+                .path("/reciter/ping")
+                .protocol(software.amazon.awscdk.services.elasticloadbalancingv2.Protocol.HTTP)
+                .unhealthyThresholdCount(3)
+                .build())
+            .protocol(ApplicationProtocol.HTTP)
             .build());
         //Path based redirect to reciter-pubmed
-        reciterListener.addTargetGroups("reciter-pubmed", AddApplicationTargetGroupsProps.builder()
+        reciterListener.addTargets("reciter-pubmed", AddApplicationTargetsProps.builder()
             .conditions(Arrays.asList(ListenerCondition.pathPatterns(Arrays.asList("/pubmed*"))))
             .priority(5)
-            .targetGroups(Arrays.asList(reciterPubmedTg))
+            .targets(Arrays.asList(reCiterPubmedService))
+            .port(80)
+            .targetGroupName("cdk-reciter-pubmed-tg")
+            .protocolVersion(ApplicationProtocolVersion.HTTP1)
+            .healthCheck(software.amazon.awscdk.services.elasticloadbalancingv2.HealthCheck.builder()
+                .enabled(true)
+                .healthyThresholdCount(3)
+                .interval(Duration.seconds(60))
+                .path("/pubmed/ping")
+                .protocol(software.amazon.awscdk.services.elasticloadbalancingv2.Protocol.HTTP)
+                .unhealthyThresholdCount(3)
+                .build())
+            .protocol(ApplicationProtocol.HTTP)
             .build());
         //Path based redirect to reciter-scopus
-        reciterListener.addTargetGroups("reciter-scopus", AddApplicationTargetGroupsProps.builder()
+        reciterListener.addTargets("reciter-scopus", AddApplicationTargetsProps.builder()
             .conditions(Arrays.asList(ListenerCondition.pathPatterns(Arrays.asList("/scopus*"))))
             .priority(6)
-            .targetGroups(Arrays.asList(reciterScopusTg))
+            .targets(Arrays.asList(reCiterScopusService))
+            .port(80)
+            .targetGroupName("cdk-reciter-scopus-tg")
+            .protocolVersion(ApplicationProtocolVersion.HTTP1)
+            .healthCheck(software.amazon.awscdk.services.elasticloadbalancingv2.HealthCheck.builder()
+                .enabled(true)
+                .healthyThresholdCount(3)
+                .interval(Duration.seconds(60))
+                .path("/scopus/ping")
+                .protocol(software.amazon.awscdk.services.elasticloadbalancingv2.Protocol.HTTP)
+                .unhealthyThresholdCount(3)
+                .build())
+            .protocol(ApplicationProtocol.HTTP)
             .build());
-        //Path based redirect to reciter
-        reciterListener.addTargetGroups("reciter-pub-manager", AddApplicationTargetGroupsProps.builder()
+        //Path based redirect to reciter-pub-manager
+        reciterListener.addTargets("reciter-pub-manager", AddApplicationTargetsProps.builder()
             .conditions(Arrays.asList(ListenerCondition.pathPatterns(Arrays.asList("/*"))))
             .priority(7)
-            .targetGroups(Arrays.asList(reciterPubManagerTg))
+            .targets(Arrays.asList(reCiterPubManagerService))
+            .port(80)
+            .targetGroupName("cdk-reciter-pub-manager-tg")
+            .protocolVersion(ApplicationProtocolVersion.HTTP1)
+            .healthCheck(software.amazon.awscdk.services.elasticloadbalancingv2.HealthCheck.builder()
+                .enabled(true)
+                .healthyThresholdCount(3)
+                .interval(Duration.seconds(60))
+                .path("/")
+                .protocol(software.amazon.awscdk.services.elasticloadbalancingv2.Protocol.HTTP)
+                .unhealthyThresholdCount(3)
+                .build())
+            .protocol(ApplicationProtocol.HTTP)
             .build());
         
         ScalableTaskCount reCiterAutoScaling =  reCiterService.autoScaleTaskCount(EnableScalingProps.builder()
