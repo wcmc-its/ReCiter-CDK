@@ -15,6 +15,11 @@ import software.amazon.awscdk.services.ecr.TagMutability;
 import software.amazon.awscdk.services.ecr.TagStatus;
 
 public class ReCiterCDKECRStack extends NestedStack {
+
+    private final Repository reciterRepo;
+    private final Repository reciterPubmedRepo;
+    private final Repository reciterScopusRepo;
+    private final Repository reciterPubManagerRepo;
     
     public ReCiterCDKECRStack(final Construct parent, final String id) {
         this(parent, id, null);
@@ -25,7 +30,7 @@ public class ReCiterCDKECRStack extends NestedStack {
 
 
         //ReCiter ECR repo
-        final Repository reciterRepo = new Repository(this, "reciterRepo", RepositoryProps.builder()
+        reciterRepo = new Repository(this, "reciterRepo", RepositoryProps.builder()
             .imageScanOnPush(true)
             .repositoryName("reciter")
             .removalPolicy(RemovalPolicy.DESTROY)
@@ -39,7 +44,7 @@ public class ReCiterCDKECRStack extends NestedStack {
             .build());
         
         //ReCiter ECR repo
-        final Repository reciterPubmedRepo = new Repository(this, "reciterPubmedRepo", RepositoryProps.builder()
+        reciterPubmedRepo = new Repository(this, "reciterPubmedRepo", RepositoryProps.builder()
             .imageScanOnPush(true)
             .repositoryName("reciter/pubmed")
             .removalPolicy(RemovalPolicy.DESTROY)
@@ -53,7 +58,7 @@ public class ReCiterCDKECRStack extends NestedStack {
             .build());
 
         //ReCiter ECR repo
-        final Repository reciterScopusRepo = new Repository(this, "reciterScopusRepo", RepositoryProps.builder()
+        reciterScopusRepo = new Repository(this, "reciterScopusRepo", RepositoryProps.builder()
             .imageScanOnPush(true)
             .repositoryName("reciter/scopus")
             .removalPolicy(RemovalPolicy.DESTROY)
@@ -67,7 +72,7 @@ public class ReCiterCDKECRStack extends NestedStack {
             .build());
 
         //ReCiter ECR repo
-        final Repository reciterPubManagerRepo = new Repository(this, "reciterPubManagerRepo", RepositoryProps.builder()
+        reciterPubManagerRepo = new Repository(this, "reciterPubManagerRepo", RepositoryProps.builder()
             .imageScanOnPush(true)
             .repositoryName("reciter/pub-manager")
             .removalPolicy(RemovalPolicy.DESTROY)
@@ -109,5 +114,18 @@ public class ReCiterCDKECRStack extends NestedStack {
             .exportName("ecrRepoUrlReCiterPubManager")
             .value(reciterPubManagerRepo.getRepositoryUri())
             .build();
+    }
+
+    public Repository getReCiterEcrRepo() {
+        return this.reciterRepo;
+    }
+    public Repository getReCiterPubmedEcrRepo() {
+        return this.reciterPubmedRepo;
+    }
+    public Repository getReCiterScopusEcrRepo() {
+        return this.reciterScopusRepo;
+    }
+    public Repository getReCiterPubManagerEcrRepo() {
+        return this.reciterPubManagerRepo;
     }
 }
