@@ -50,7 +50,7 @@ public class ReCiterCdkApp {
                 .description("This stack is the master stack that will build VPC, ECR, ECS, WAF, SecretsManager, CodePipeline, Codebuild for ReCiter and its components.")
                 .terminationProtection(false)
                 .stackName("ReCiterCdkMasterStack")
-                .tags(new HashMap(){{
+                .tags(new HashMap<String, String>(){{
                         put("application", "ReCiter");
                         put("cdk-maintainer", "Sarbajit Dutta - szd2013@med.cornell.edu");
                 }})

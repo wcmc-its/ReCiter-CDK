@@ -48,7 +48,7 @@ public class ReCiterCDKVPCStack extends NestedStack {
                 SubnetConfiguration.builder().cidrMask(24).name("reciter-private-app-subnet").subnetType(SubnetType.PRIVATE).build(),
                 SubnetConfiguration.builder().cidrMask(28).name("reciter-private-db-subnet").subnetType(SubnetType.PRIVATE).build()))
             .enableDnsHostnames(true)
-            .flowLogs(new HashMap(){{
+            .flowLogs(new HashMap<String, FlowLogOptions>(){{
                 put("reciter-flow-logs", FlowLogOptions.builder()
                     .trafficType(FlowLogTrafficType.ALL)
                     .destination(FlowLogDestination.toCloudWatchLogs(new LogGroup(parent, "reciterVpcFlowLogs", LogGroupProps.builder()
