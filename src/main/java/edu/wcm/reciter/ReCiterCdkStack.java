@@ -54,6 +54,15 @@ public class ReCiterCdkStack extends Stack {
             reCiterCDKECSStack.getAlb());
         NestedStack.isNestedStack(reCiterCdkWAFStack);
         reCiterCdkWAFStack.addDependency(reCiterCDKECSStack, "WAF dependent on ALB");
+
+        ReCiterCdkPipelineStack reCiterCdkPipelineStack = new ReCiterCdkPipelineStack(this, "reCiterCdkCodeBuildStack", NestedStackProps.builder()
+            .removalPolicy(RemovalPolicy.DESTROY)
+            .build(), 
+            reCiterCDKECSStack.getCluster(), reCiterCDKECRStack.getReCiterEcrRepo(), reCiterCDKECRStack.getReCiterPubmedEcrRepo(), reCiterCDKECRStack.getReCiterScopusEcrRepo(), reCiterCDKECRStack.getReCiterPubManagerEcrRepo(),
+            reCiterCDKECSStack.getReCiterTopic(), 
+            reCiterCDKECSStack.getReCiterPubmedService(), reCiterCDKECSStack.getReCiterScopusService(), reCiterCDKECSStack.getReCiterService(), reCiterCDKECSStack.getReCiterPubManagerService());
+        reCiterCdkPipelineStack.addDependency(reCiterCDKECRStack);
+        reCiterCdkPipelineStack.addDependency(reCiterCDKECSStack);
         
     }
 }
