@@ -72,6 +72,13 @@ import software.amazon.awscdk.services.sns.TopicProps;
 public class ReCiterCDKECSStack extends NestedStack {
 
     private final ApplicationLoadBalancer reCiterEcsALB;
+    private final Cluster reCiterCluster;
+    private final Topic reciterAlarmTopic;
+    private FargateService reCiterPubmedService;
+    private FargateService reCiterService;
+    private FargateService reCiterScopusService;
+    private FargateService reCiterPubManagerService;
+    
     
     public ReCiterCDKECSStack(final Construct parent, final String id) {
         this(parent, id, null, null, null, null, null, null, null, null, null);
@@ -116,7 +123,7 @@ public class ReCiterCDKECSStack extends NestedStack {
 
 
         //ReCiter Cluster
-        final Cluster reCiterCluster = new Cluster(this, "reCiterCluster", ClusterProps.builder()
+        reCiterCluster = new Cluster(this, "reCiterCluster", ClusterProps.builder()
             .clusterName("reCiter")
             .containerInsights(true)
             .enableFargateCapacityProviders(true)
@@ -182,7 +189,7 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .build()))
             .containerName("reciter")
             .healthCheck(HealthCheck.builder()
-                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost/reciter/ping || exit 1"))
+                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost:5000/reciter/ping || exit 1"))
                 .interval(Duration.minutes(5))
                 .retries(2)
                 .startPeriod(Duration.seconds(120))
@@ -190,15 +197,15 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .build())
             .memoryReservationMiB(1500)
             .memoryLimitMiB(1600)
-            .environment(new HashMap(){{
+            .environment(new HashMap<String, String>(){{
                 put("PUBMED_SERVICE", "http://" + reCiterEcsALB.getLoadBalancerDnsName());
                 put("SCOPUS_SERVICE", "http://" + reCiterEcsALB.getLoadBalancerDnsName());
             }})
-            .secrets(new HashMap(){{
+            .secrets(new HashMap<String, Secret>(){{
                 //put("AMAZON_AWS_ACCESS_KEY", Secret.fromSecretsManager(reCiterSecret, "AMAZON_AWS_ACCESS_KEY"));
                 //put("AMAZON_AWS_SECRET_KEY", Secret.fromSecretsManager(reCiterSecret, "AMAZON_AWS_SECRET_KEY"));
                 put("ADMIN_API_KEY", Secret.fromSecretsManager(reCiterSecret, "ADMIN_API_KEY"));
-                put("CONSUMER_API_KEY", Secret.fromSecretsManager(reCiterSecret, "AMAZON_AWS_SECRET_KEY"));
+                put("CONSUMER_API_KEY", Secret.fromSecretsManager(reCiterSecret, "CONSUMER_API_KEY"));
                 put("AWS_REGION", Secret.fromSecretsManager(reCiterSecret, "AWS_REGION"));
                 put("SERVER_PORT", Secret.fromSecretsManager(reCiterSecret, "SERVER_PORT"));
             }})
@@ -228,7 +235,7 @@ public class ReCiterCDKECSStack extends NestedStack {
 
         reciterClusterSg.getConnections().allowFrom(reCiterEcsALB, Port.tcp(80), "Allow reciter ALB TCP connection from Port 5000");
         
-        FargateService reCiterService = new FargateService(this, "reCiterFargateService", FargateServiceProps.builder()
+        reCiterService = new FargateService(this, "reCiterFargateService", FargateServiceProps.builder()
             .cluster(reCiterCluster)
             .taskDefinition(reCiterTaskDefinition)
             .desiredCount(1)
@@ -299,7 +306,7 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .build()))
             .containerName("reciter-pubmed")
             .healthCheck(HealthCheck.builder()
-                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost/pubmed/ping || exit 1"))
+                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost:5000/pubmed/ping || exit 1"))
                 .interval(Duration.minutes(5))
                 .retries(2)
                 .startPeriod(Duration.seconds(60))
@@ -307,7 +314,7 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .build())
             .memoryReservationMiB(1500)
             .memoryLimitMiB(1600)
-            .secrets(new HashMap(){{
+            .secrets(new HashMap<String, Secret>(){{
                 put("PUBMED_API_KEY", Secret.fromSecretsManager(reciterPubmedSecret, "PUBMED_API_KEY"));
             }})
             .taskDefinition(reCiterPubmedTaskDefinition)
@@ -324,7 +331,7 @@ public class ReCiterCDKECSStack extends NestedStack {
             .protocol(Protocol.TCP)
             .build());
         
-        FargateService reCiterPubmedService = new FargateService(this, "reCiterPubmedFargateService", FargateServiceProps.builder()
+        reCiterPubmedService = new FargateService(this, "reCiterPubmedFargateService", FargateServiceProps.builder()
             .cluster(reCiterCluster)
             .taskDefinition(reCiterPubmedTaskDefinition)
             .desiredCount(1)
@@ -394,7 +401,7 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .build()))
             .containerName("reciter-scopus")
             .healthCheck(HealthCheck.builder()
-                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost/scopus/ping || exit 1"))
+                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost:5000/scopus/ping || exit 1"))
                 .interval(Duration.minutes(5))
                 .retries(2)
                 .startPeriod(Duration.seconds(60))
@@ -402,7 +409,7 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .build())
             .memoryReservationMiB(1500)
             .memoryLimitMiB(1600)
-            .secrets(new HashMap(){{
+            .secrets(new HashMap<String, Secret>(){{
                 put("SCOPUS_API_KEY", Secret.fromSecretsManager(reciterScopusSecret, "SCOPUS_API_KEY"));
                 put("SCOPUS_INST_TOKEN", Secret.fromSecretsManager(reciterScopusSecret, "SCOPUS_INST_TOKEN"));
             }})
@@ -423,7 +430,7 @@ public class ReCiterCDKECSStack extends NestedStack {
         
 
         
-        FargateService reCiterScopusService = new FargateService(this, "reCiterScopusFargateService", FargateServiceProps.builder()
+        reCiterScopusService = new FargateService(this, "reCiterScopusFargateService", FargateServiceProps.builder()
             .cluster(reCiterCluster)
             .taskDefinition(reCiterScopusTaskDefinition)
             .desiredCount(1)
@@ -488,7 +495,7 @@ public class ReCiterCDKECSStack extends NestedStack {
             .build());
 
         
-        FargateService reCiterPubManagerService = new FargateService(this, "reCiterPubManagerFargateService", FargateServiceProps.builder()
+        reCiterPubManagerService = new FargateService(this, "reCiterPubManagerFargateService", FargateServiceProps.builder()
             .cluster(reCiterCluster)
             .taskDefinition(reCiterPubManagerTaskDefinition)
             .desiredCount(1)
@@ -677,7 +684,7 @@ public class ReCiterCDKECSStack extends NestedStack {
             .build());
 
         //Create a SNS Topic
-        Topic reciterAlarmTopic = new Topic(this, "reCiterSnsTopic", TopicProps.builder()
+        reciterAlarmTopic = new Topic(this, "reCiterSnsTopic", TopicProps.builder()
             .topicName("reciter-monitor-topic")
             .displayName("reciter-monitor-topic")
             .build());
@@ -820,4 +827,29 @@ public class ReCiterCDKECSStack extends NestedStack {
     public ApplicationLoadBalancer getAlb() {
         return this.reCiterEcsALB;
     }
+
+    public Cluster getCluster() {
+        return this.reCiterCluster;
+    }
+
+    public Topic getReCiterTopic() {
+        return this.reciterAlarmTopic;
+    }
+
+    public FargateService getReCiterPubmedService() {
+        return this.reCiterPubmedService;
+    }
+
+    public FargateService getReCiterScopusService() {
+        return this.reCiterScopusService;
+    }
+
+    public FargateService getReCiterService() {
+        return this.reCiterService;
+    }
+
+    public FargateService getReCiterPubManagerService() {
+        return this.reCiterPubManagerService;
+    }
+
 }
