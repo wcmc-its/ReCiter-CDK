@@ -105,12 +105,13 @@ public class ReCiterCDKECRStack extends NestedStack {
             .value(reciterPubmedRepo.getRepositoryUri())
             .build();
         
-        CfnOutput.Builder.create(this, "ecrRepoUrlReCiterScopus")
-            .description("ECR Repo url for ReCiter-Scopus")
-            .exportName("ecrRepoUrlReCiterScopus")
-            .value(reciterScopusRepo.getRepositoryUri())
-            .build();
-        
+        if(System.getenv("INCLUDE_SCOPUS") != null && System.getenv("INCLUDE_SCOPUS").equals("true")) {
+            CfnOutput.Builder.create(this, "ecrRepoUrlReCiterScopus")
+                .description("ECR Repo url for ReCiter-Scopus")
+                .exportName("ecrRepoUrlReCiterScopus")
+                .value(reciterScopusRepo.getRepositoryUri())
+                .build();
+        }
         CfnOutput.Builder.create(this, "ecrRepoUrlReCiterPubManager")
             .description("ECR Repo url for ReCiter-Pub-Manager")
             .exportName("ecrRepoUrlReCiterPubManager")

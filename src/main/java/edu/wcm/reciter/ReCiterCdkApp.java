@@ -35,9 +35,9 @@ public class ReCiterCdkApp {
         ||
         (System.getenv("GITHUB_PERSONAL_ACCESS_TOKEN") == null || System.getenv("GITHUB_PERSONAL_ACCESS_TOKEN").isEmpty())
         ||
-        (System.getenv("INLCUDE_SCOPUS") == null || System.getenv("INLCUDE_SCOPUS").isEmpty())
+        (System.getenv("INCLUDE_SCOPUS") == null || System.getenv("INCLUDE_SCOPUS").isEmpty())
         ||
-        (System.getenv("INLCUDE_SCOPUS").equals("true") && (System.getenv("SCOPUS_API_KEY") == null || System.getenv("SCOPUS_INST_TOKEN") == null))
+        (System.getenv("INCLUDE_SCOPUS").equals("true") && (System.getenv("SCOPUS_API_KEY") == null || System.getenv("SCOPUS_INST_TOKEN") == null))
         ) {
                 System.out.println("Please set all the environment variables to run the stack. Make sure the following variables are set: \n" + 
                 "ADMIN_API_KEY: The admin api key used for ReCiter\n" +
@@ -46,7 +46,7 @@ public class ReCiterCdkApp {
                 "ALARM_EMAIL: The email address where alerts for ReCiter and its components will be sent\n" +
                 "GITHUB_USER: The github username where the reciter and its components are forked\n" +
                 "GITHUB_PERSONAL_ACCESS_TOKEN: The personal access token to fetch the repository and create webhooks\n" +
-                "INLCUDE_SCOPUS: If you have scopus subscription then do true otherwise false\n" +
+                "INCLUDE_SCOPUS: If you have scopus subscription then do true otherwise false\n" +
                 "SCOPUS_API_KEY: If INLCUDE_SCOPUS variable is true then this needs to be set\n" +
                 "SCOPUS_INST_TOKEN: If INLCUDE_SCOPUS variable is true then this needs to be set\n");
                 System.exit(1);
