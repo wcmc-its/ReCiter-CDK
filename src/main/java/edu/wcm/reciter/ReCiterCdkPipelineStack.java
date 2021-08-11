@@ -40,13 +40,15 @@ import software.amazon.awscdk.services.codepipeline.actions.ManualApprovalAction
 import software.amazon.awscdk.services.ecr.Repository;
 import software.amazon.awscdk.services.ecs.Cluster;
 import software.amazon.awscdk.services.ecs.FargateService;
+import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationLoadBalancer;
 import software.amazon.awscdk.services.iam.PolicyStatement;
+import software.amazon.awscdk.services.secretsmanager.ISecret;
 import software.amazon.awscdk.services.sns.Topic;
 
 public class ReCiterCdkPipelineStack extends NestedStack {
 
     private final Project reCiterPubmedCodebuildProject;
-    private final Project reCiterScopusCodebuildProject;
+    private Project reCiterScopusCodebuildProject;
     private final Project reCiterCodebuildProject;
     private final Project reCiterPubManagerCodebuildProject;
     private Artifact sourceOutput = new Artifact();
@@ -59,18 +61,19 @@ public class ReCiterCdkPipelineStack extends NestedStack {
     private Artifact reCiterPubManagerbuildOutput = new Artifact();
     
     public ReCiterCdkPipelineStack(final Construct parent, final String id) {
-        this(parent, id, null, null, null, null, null, null, null, null, null, null, null);
+        this(parent, id, null, null, null, null, null, null, null, null, null, null, null, null, null);
     }
 
     public ReCiterCdkPipelineStack(final Construct parent, final String id, final NestedStackProps props, Cluster reCiterCluster, Repository reCiterEcrRepo, Repository reCiterPubmedEcrRepo, Repository reCiterScopusEcrRepo, Repository reCiterPubManagerEcrRepo, Topic reCiterTopic, 
-    FargateService reCiterPubmedService, FargateService reCiterScopusService, FargateService reCiterService, FargateService reCiterPubManagerService) {
+    FargateService reCiterPubmedService, FargateService reCiterScopusService, FargateService reCiterService, FargateService reCiterPubManagerService,
+    ISecret reCiterSecret, ApplicationLoadBalancer reCiterAlb) {
         super(parent, id, props);
 
         //CodeBuild Project for ReCiter-Pubmed
         reCiterPubmedCodebuildProject = new Project(this, "reciter-pubmed-codebuild", ProjectProps.builder()
             .projectName("ReCiter-Pubmed-Retrieval-Tool")
             .source(Source.gitHub(GitHubSourceProps.builder()
-                .owner("sarbajitdutta")
+                .owner(System.getenv("GITHUB_USER"))
                 .repo("ReCiter-PubMed-Retrieval-Tool")
                 .webhook(false)
                 //.webhookFilters(Arrays.asList(FilterGroup.inEventOf(EventAction.PUSH).andBranchIs("master")))
@@ -128,73 +131,75 @@ public class ReCiterCdkPipelineStack extends NestedStack {
             .build());
         reCiterPubmedEcrRepo.grantPullPush(reCiterPubmedCodebuildProject.getRole());
 
-        //CodeBuild Project for ReCiter-Scopus
-        reCiterScopusCodebuildProject = new Project(this, "reciter-scopus-codebuild", ProjectProps.builder()
-            .projectName("ReCiter-Scopus-Retrieval-Tool")
-            .source(Source.gitHub(GitHubSourceProps.builder()
-                .owner("sarbajitdutta")
-                .repo("ReCiter-Scopus-Retrieval-Tool")
-                .webhook(false)
-                //.webhookFilters(Arrays.asList(FilterGroup.inEventOf(EventAction.PUSH).andBranchIs("master")))
-                .reportBuildStatus(false)
-                .build()))
-            .environment(BuildEnvironment.builder()
-                .buildImage(LinuxBuildImage.AMAZON_LINUX_2_3)
-                .computeType(ComputeType.SMALL)
-                .privileged(true)
-                .build())
-            .badge(true)
-            .cache(Cache.local(LocalCacheMode.DOCKER_LAYER))
-            .environmentVariables(new HashMap<String, BuildEnvironmentVariable>(){{
-                put("ECR_REPO_URI", BuildEnvironmentVariable.builder()
+        if(System.getenv("INCLUDE_SCOPUS") != null && System.getenv("INCLUDE_SCOPUS").equals("true")) {
+            //CodeBuild Project for ReCiter-Scopus
+            reCiterScopusCodebuildProject = new Project(this, "reciter-scopus-codebuild", ProjectProps.builder()
+                .projectName("ReCiter-Scopus-Retrieval-Tool")
+                .source(Source.gitHub(GitHubSourceProps.builder()
+                    .owner(System.getenv("GITHUB_USER"))
+                    .repo("ReCiter-Scopus-Retrieval-Tool")
+                    .webhook(false)
+                    //.webhookFilters(Arrays.asList(FilterGroup.inEventOf(EventAction.PUSH).andBranchIs("master")))
+                    .reportBuildStatus(false)
+                    .build()))
+                .environment(BuildEnvironment.builder()
+                    .buildImage(LinuxBuildImage.AMAZON_LINUX_2_3)
+                    .computeType(ComputeType.SMALL)
+                    .privileged(true)
+                    .build())
+                .badge(true)
+                .cache(Cache.local(LocalCacheMode.DOCKER_LAYER))
+                .environmentVariables(new HashMap<String, BuildEnvironmentVariable>(){{
+                    put("ECR_REPO_URI", BuildEnvironmentVariable.builder()
+                            .type(BuildEnvironmentVariableType.PLAINTEXT)
+                            .value(reCiterScopusEcrRepo.getRepositoryUri())
+                            .build());
+                    put("CLUSTER_NAME", BuildEnvironmentVariable.builder()
                         .type(BuildEnvironmentVariableType.PLAINTEXT)
-                        .value(reCiterScopusEcrRepo.getRepositoryUri())
+                        .value(reCiterCluster.getClusterName())
                         .build());
-                put("CLUSTER_NAME", BuildEnvironmentVariable.builder()
-                    .type(BuildEnvironmentVariableType.PLAINTEXT)
-                    .value(reCiterCluster.getClusterName())
-                    .build());
-            }})
-            .buildSpec(BuildSpec.fromObjectToYaml(new HashMap<String, Object>(){{
-                put("version", "0.2");
-                put("phases", new JSONObject()
-                    .put("pre_build", new JSONObject()
-                        .put("commands", new JSONArray()
-                            .put("env")
-                            .put("export TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION}")))
-                    .put("build", new JSONObject()
-                        .put("commands", new JSONArray()
-                            .put("mvn clean install -Dmaven.test.skip=true")
-                            .put("docker build -t $ECR_REPO_URI:$TAG .")
-                            .put("$(aws ecr get-login --no-include-email)")
-                            .put("docker push $ECR_REPO_URI:$TAG")))
-                    .put("post_build", new JSONObject()
-                        .put("commands", new JSONArray()
-                            .put("echo \"In Post-Build Stage\"")
-                            .put("printf '[{\"name\":\"reciter-scopus\",\"imageUri\":\"%s\"}]' $ECR_REPO_URI:$TAG > imagedefinitions.json")
-                            .put("pwd; ls -al; cat imagedefinitions.json"))).toMap());
-                put("artifacts", new JSONObject()
-                .put("files", new JSONArray()
-                    .put("imagedefinitions.json")).toMap());
-            }}))
-            .build());
+                }})
+                .buildSpec(BuildSpec.fromObjectToYaml(new HashMap<String, Object>(){{
+                    put("version", "0.2");
+                    put("phases", new JSONObject()
+                        .put("pre_build", new JSONObject()
+                            .put("commands", new JSONArray()
+                                .put("env")
+                                .put("export TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION}")))
+                        .put("build", new JSONObject()
+                            .put("commands", new JSONArray()
+                                .put("mvn clean install -Dmaven.test.skip=true")
+                                .put("docker build -t $ECR_REPO_URI:$TAG .")
+                                .put("$(aws ecr get-login --no-include-email)")
+                                .put("docker push $ECR_REPO_URI:$TAG")))
+                        .put("post_build", new JSONObject()
+                            .put("commands", new JSONArray()
+                                .put("echo \"In Post-Build Stage\"")
+                                .put("printf '[{\"name\":\"reciter-scopus\",\"imageUri\":\"%s\"}]' $ECR_REPO_URI:$TAG > imagedefinitions.json")
+                                .put("pwd; ls -al; cat imagedefinitions.json"))).toMap());
+                    put("artifacts", new JSONObject()
+                    .put("files", new JSONArray()
+                        .put("imagedefinitions.json")).toMap());
+                }}))
+                .build());
 
-        //Roles section
-        reCiterScopusCodebuildProject.addToRolePolicy(PolicyStatement.Builder.create()
-            .actions(Arrays.asList("ecs:DescribeCluster",
-            "ecr:GetAuthorizationToken",
-            "ecr:BatchCheckLayerAvailability",
-            "ecr:BatchGetImage",
-            "ecr:GetDownloadUrlForLayer"))
-            .resources(Arrays.asList(reCiterCluster.getClusterArn()))
-            .build());
-        reCiterScopusEcrRepo.grantPullPush(reCiterScopusCodebuildProject.getRole());
+            //Roles section
+            reCiterScopusCodebuildProject.addToRolePolicy(PolicyStatement.Builder.create()
+                .actions(Arrays.asList("ecs:DescribeCluster",
+                "ecr:GetAuthorizationToken",
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:BatchGetImage",
+                "ecr:GetDownloadUrlForLayer"))
+                .resources(Arrays.asList(reCiterCluster.getClusterArn()))
+                .build());
+            reCiterScopusEcrRepo.grantPullPush(reCiterScopusCodebuildProject.getRole());
+        }
 
         //CodeBuild Project for ReCiter
         reCiterCodebuildProject = new Project(this, "reciter-codebuild", ProjectProps.builder()
             .projectName("ReCiter")
             .source(Source.gitHub(GitHubSourceProps.builder()
-                .owner("sarbajitdutta")
+                .owner(System.getenv("GITHUB_USER"))
                 .repo("ReCiter")
                 .webhook(false)
                 //.webhookFilters(Arrays.asList(FilterGroup.inEventOf(EventAction.PUSH).andBranchIs("master")))
@@ -256,7 +261,7 @@ public class ReCiterCdkPipelineStack extends NestedStack {
         reCiterPubManagerCodebuildProject = new Project(this, "reciter-pub-manager-codebuild", ProjectProps.builder()
             .projectName("ReCiter-Publication-Manager")
             .source(Source.gitHub(GitHubSourceProps.builder()
-                .owner("sarbajitdutta")
+                .owner(System.getenv("GITHUB_USER"))
                 .repo("ReCiter-Publication-Manager")
                 .webhook(false)
                 //.webhookFilters(Arrays.asList(FilterGroup.inEventOf(EventAction.PUSH).andBranchIs("master")))
@@ -278,6 +283,18 @@ public class ReCiterCdkPipelineStack extends NestedStack {
                     .type(BuildEnvironmentVariableType.PLAINTEXT)
                     .value(reCiterCluster.getClusterName())
                     .build());
+                put("ADMIN_API_KEY", BuildEnvironmentVariable.builder()
+                    .type(BuildEnvironmentVariableType.SECRETS_MANAGER)
+                    .value(reCiterSecret.getSecretArn() + ":ADMIN_API_KEY")
+                    .build());
+                put("RECITER_ALB_URL", BuildEnvironmentVariable.builder()
+                    .type(BuildEnvironmentVariableType.PLAINTEXT)
+                    .value(reCiterAlb.getLoadBalancerDnsName())
+                    .build());
+                put("TOKEN_SECRET", BuildEnvironmentVariable.builder()
+                    .type(BuildEnvironmentVariableType.PLAINTEXT)
+                    .value("d9mpGQUKzgq*7A#X")
+                    .build());
             }})
             .buildSpec(BuildSpec.fromObjectToYaml(new HashMap<String, Object>(){{
                 put("version", "0.2");
@@ -288,6 +305,10 @@ public class ReCiterCdkPipelineStack extends NestedStack {
                             .put("export TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION}")))
                     .put("build", new JSONObject()
                         .put("commands", new JSONArray()
+                            .put("sed -i -e \"s/ADMIN_API_KEY/$ADMIN_API_KEY/g\" config/local.js")
+                            .put("sed -i -e \"s/TOKEN_SECRET/$TOKEN_SECRET/g\" config/local.js")
+                            .put("sed -i -e \"s/RECITER_ALB_URL/$RECITER_ALB_URL/g\" config/local.js")
+                            .put("cat config/local.js")
                             .put("docker build -t $ECR_REPO_URI:$TAG .")
                             .put("$(aws ecr get-login --no-include-email)")
                             .put("docker push $ECR_REPO_URI:$TAG")))
@@ -317,10 +338,10 @@ public class ReCiterCdkPipelineStack extends NestedStack {
         //ReCiter-Pubmed Pipeline
         final GitHubSourceAction sourceAction = new GitHubSourceAction(GitHubSourceActionProps.builder()
             .actionName("Github_Source")
-            .owner("sarbajitdutta")
+            .owner(System.getenv("GITHUB_USER"))
             .repo("ReCiter-PubMed-Retrieval-Tool")
             .branch("master")
-            .oauthToken(SecretValue.plainText("blahblah"))
+            .oauthToken(SecretValue.plainText(System.getenv("GITHUB_PERSONAL_ACCESS_TOKEN")))
             .output(sourceOutput)
             .build());
 
@@ -365,47 +386,48 @@ public class ReCiterCdkPipelineStack extends NestedStack {
             .build());
 
         //Pipeline for ReCiter Scopus
-
-        final Pipeline reCiterScopusCodePipeline = new Pipeline(this, "reCiterScopusCodePipeline", PipelineProps.builder()
-            .pipelineName("ReCiter-Scopus-Retrieval-Tool")
-            .stages(Arrays.asList(
-                StageProps.builder()
-                    .stageName("Source")
-                    .actions(Arrays.asList(new GitHubSourceAction(GitHubSourceActionProps.builder()
-                        .actionName("Github_Source")
-                        .owner("sarbajitdutta")
-                        .repo("ReCiter-Scopus-Retrieval-Tool")
-                        .branch("master")
-                        .oauthToken(SecretValue.plainText("blahblah"))
-                        .output(reCiterScopusSourceOutput)
-                        .build())))
-                    .build(),
-                StageProps.builder()
-                    .stageName("Build")
-                    .actions(Arrays.asList(new CodeBuildAction(CodeBuildActionProps.builder()
-                        .actionName("CodeBuild")
-                        .project(reCiterScopusCodebuildProject)
-                        .input(reCiterScopusSourceOutput)
-                        .outputs(Arrays.asList(reCiterScopusbuildOutput))
-                        .build())))
-                    .build(),
-                StageProps.builder()
-                    .stageName("Approve")
-                    .actions(Arrays.asList(new ManualApprovalAction(ManualApprovalActionProps.builder()
-                        .actionName("Approve")
-                        .notificationTopic(reCiterTopic)
-                        .build())))
-                    .build(),
-                StageProps.builder()
-                    .stageName("Deploy-to-ECS")
-                    .actions(Arrays.asList(new EcsDeployAction(EcsDeployActionProps.builder()
-                        .actionName("DeployAction")
-                        .service(reCiterScopusService)
-                        .imageFile(new ArtifactPath(reCiterScopusbuildOutput, "imagedefinitions.json"))
-                        .build())))
-                    .build()
-            ))
-            .build());
+        if(System.getenv("INCLUDE_SCOPUS") != null && System.getenv("INCLUDE_SCOPUS").equals("true")) {
+            final Pipeline reCiterScopusCodePipeline = new Pipeline(this, "reCiterScopusCodePipeline", PipelineProps.builder()
+                .pipelineName("ReCiter-Scopus-Retrieval-Tool")
+                .stages(Arrays.asList(
+                    StageProps.builder()
+                        .stageName("Source")
+                        .actions(Arrays.asList(new GitHubSourceAction(GitHubSourceActionProps.builder()
+                            .actionName("Github_Source")
+                            .owner(System.getenv("GITHUB_USER"))
+                            .repo("ReCiter-Scopus-Retrieval-Tool")
+                            .branch("master")
+                            .oauthToken(SecretValue.plainText(System.getenv("GITHUB_PERSONAL_ACCESS_TOKEN")))
+                            .output(reCiterScopusSourceOutput)
+                            .build())))
+                        .build(),
+                    StageProps.builder()
+                        .stageName("Build")
+                        .actions(Arrays.asList(new CodeBuildAction(CodeBuildActionProps.builder()
+                            .actionName("CodeBuild")
+                            .project(reCiterScopusCodebuildProject)
+                            .input(reCiterScopusSourceOutput)
+                            .outputs(Arrays.asList(reCiterScopusbuildOutput))
+                            .build())))
+                        .build(),
+                    StageProps.builder()
+                        .stageName("Approve")
+                        .actions(Arrays.asList(new ManualApprovalAction(ManualApprovalActionProps.builder()
+                            .actionName("Approve")
+                            .notificationTopic(reCiterTopic)
+                            .build())))
+                        .build(),
+                    StageProps.builder()
+                        .stageName("Deploy-to-ECS")
+                        .actions(Arrays.asList(new EcsDeployAction(EcsDeployActionProps.builder()
+                            .actionName("DeployAction")
+                            .service(reCiterScopusService)
+                            .imageFile(new ArtifactPath(reCiterScopusbuildOutput, "imagedefinitions.json"))
+                            .build())))
+                        .build()
+                ))
+                .build());
+        }
 
         //Pipeline for ReCiter
 
@@ -416,10 +438,10 @@ public class ReCiterCdkPipelineStack extends NestedStack {
                     .stageName("Source")
                     .actions(Arrays.asList(new GitHubSourceAction(GitHubSourceActionProps.builder()
                         .actionName("Github_Source")
-                        .owner("sarbajitdutta")
+                        .owner(System.getenv("GITHUB_USER"))
                         .repo("ReCiter")
                         .branch("master")
-                        .oauthToken(SecretValue.plainText("blahblah"))
+                        .oauthToken(SecretValue.plainText(System.getenv("GITHUB_PERSONAL_ACCESS_TOKEN")))
                         .output(reCiterSourceOutput)
                         .build())))
                     .build(),
@@ -459,10 +481,10 @@ public class ReCiterCdkPipelineStack extends NestedStack {
                     .stageName("Source")
                     .actions(Arrays.asList(new GitHubSourceAction(GitHubSourceActionProps.builder()
                         .actionName("Github_Source")
-                        .owner("sarbajitdutta")
+                        .owner(System.getenv("GITHUB_USER"))
                         .repo("ReCiter-Publication-Manager")
                         .branch("master")
-                        .oauthToken(SecretValue.plainText("blahblah"))
+                        .oauthToken(SecretValue.plainText(System.getenv("GITHUB_PERSONAL_ACCESS_TOKEN")))
                         .output(reCiterPubManagerSourceOutput)
                         .build())))
                     .build(),
@@ -492,8 +514,6 @@ public class ReCiterCdkPipelineStack extends NestedStack {
                     .build()
             ))
             .build());
-
-        
         
     }
 
