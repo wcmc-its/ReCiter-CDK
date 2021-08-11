@@ -15,7 +15,7 @@ public class ReCiterCdkSecretsManagerStack extends NestedStack {
     
     private final ISecret reciterSecret;
     private final ISecret reciterPubmedSecret;
-    private final ISecret reciterScopusSecret;
+    private ISecret reciterScopusSecret;
 
     public ReCiterCdkSecretsManagerStack(final Construct parent, final String id) {
         this(parent, id, null);
@@ -50,19 +50,21 @@ public class ReCiterCdkSecretsManagerStack extends NestedStack {
                 .build())
             .secretName("cdk-reciter-pubmed-secrets")
             .build());
-
-        reciterScopusSecret = new Secret(this, "reciterScopusSecret", SecretProps.builder()
-            .description("This contains all secrets for ReCiter-Scopus application")
-            .removalPolicy(RemovalPolicy.DESTROY)
-            .generateSecretString(SecretStringGenerator.builder()
-                .secretStringTemplate(new JSONObject()
-                    .put("SCOPUS_API_KEY", System.getenv("SCOPUS_API_KEY")) 
-                    .put("SCOPUS_INST_TOKEN", System.getenv("SCOPUS_INST_TOKEN"))                    
-                .toString())
-                .generateStringKey("password")
-                .build())
-            .secretName("cdk-reciter-scopus-secrets")
-            .build());
+        
+        if(System.getenv("INCLUDE_SCOPUS") != null && System.getenv("INCLUDE_SCOPUS").equals("true")) {
+            reciterScopusSecret = new Secret(this, "reciterScopusSecret", SecretProps.builder()
+                .description("This contains all secrets for ReCiter-Scopus application")
+                .removalPolicy(RemovalPolicy.DESTROY)
+                .generateSecretString(SecretStringGenerator.builder()
+                    .secretStringTemplate(new JSONObject()
+                        .put("SCOPUS_API_KEY", System.getenv("SCOPUS_API_KEY")) 
+                        .put("SCOPUS_INST_TOKEN", System.getenv("SCOPUS_INST_TOKEN"))                    
+                    .toString())
+                    .generateStringKey("password")
+                    .build())
+                .secretName("cdk-reciter-scopus-secrets")
+                .build());
+        }
     }
 
     public ISecret getReCiterSecret() {

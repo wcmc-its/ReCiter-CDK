@@ -18,7 +18,7 @@ public class ReCiterCDKECRStack extends NestedStack {
 
     private final Repository reciterRepo;
     private final Repository reciterPubmedRepo;
-    private final Repository reciterScopusRepo;
+    private Repository reciterScopusRepo;
     private final Repository reciterPubManagerRepo;
     
     public ReCiterCDKECRStack(final Construct parent, final String id) {
@@ -57,19 +57,21 @@ public class ReCiterCDKECRStack extends NestedStack {
             .imageTagMutability(TagMutability.MUTABLE)
             .build());
 
-        //ReCiter ECR repo
-        reciterScopusRepo = new Repository(this, "reciterScopusRepo", RepositoryProps.builder()
-            .imageScanOnPush(true)
-            .repositoryName("reciter/scopus")
-            .removalPolicy(RemovalPolicy.DESTROY)
-            .lifecycleRules(Arrays.asList(LifecycleRule.builder()
-                .description("remove old images")
-                .maxImageCount(10)
-                .rulePriority(1)
-                .tagStatus(TagStatus.ANY)
-                .build()))
-            .imageTagMutability(TagMutability.MUTABLE)
-            .build());
+        if(System.getenv("INCLUDE_SCOPUS") != null && System.getenv("INCLUDE_SCOPUS").equals("true")) {
+            //ReCiter ECR repo
+            reciterScopusRepo = new Repository(this, "reciterScopusRepo", RepositoryProps.builder()
+                .imageScanOnPush(true)
+                .repositoryName("reciter/scopus")
+                .removalPolicy(RemovalPolicy.DESTROY)
+                .lifecycleRules(Arrays.asList(LifecycleRule.builder()
+                    .description("remove old images")
+                    .maxImageCount(10)
+                    .rulePriority(1)
+                    .tagStatus(TagStatus.ANY)
+                    .build()))
+                .imageTagMutability(TagMutability.MUTABLE)
+                .build());
+        }
 
         //ReCiter ECR repo
         reciterPubManagerRepo = new Repository(this, "reciterPubManagerRepo", RepositoryProps.builder()

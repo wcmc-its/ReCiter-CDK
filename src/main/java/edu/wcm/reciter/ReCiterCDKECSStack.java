@@ -142,15 +142,7 @@ public class ReCiterCDKECSStack extends NestedStack {
             .sid("DynamoDbS3FullAccess")
             .build()));
 
-        reCiterTaskDefinition.addToExecutionRolePolicy(new PolicyStatement(PolicyStatementProps.builder()
-            .actions(Arrays.asList("ecr:GetDownloadUrlForLayer",
-                "ecr:BatchGetImage",
-                "ecr:GetAuthorizationToken",
-                "ecr:BatchCheckLayerAvailability"))
-            .effect(Effect.ALLOW)
-            .resources(Arrays.asList(reCiterEcrRepo.getRepositoryArn()))
-            .sid("AccessToPullImage")
-        .build()));
+        reCiterEcrRepo.grantPull(reCiterTaskDefinition.obtainExecutionRole());
 
         ContainerDefinition reCiterNginxContainer = reCiterTaskDefinition.addContainer("reCiterNginxContainer", ContainerDefinitionProps.builder()
             .image(ContainerImage.fromRegistry("wcmcits/reciter-nginx:latest"))
@@ -189,7 +181,7 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .build()))
             .containerName("reciter")
             .healthCheck(HealthCheck.builder()
-                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost:5000/reciter/ping || exit 1"))
+                .command(Arrays.asList("CMD-SHELL", "wget --spider -S http://localhost:5000/reciter/ping || exit 1"))
                 .interval(Duration.minutes(5))
                 .retries(2)
                 .startPeriod(Duration.seconds(120))
@@ -258,16 +250,8 @@ public class ReCiterCDKECSStack extends NestedStack {
             .cpu(1024)
             .memoryLimitMiB(2048)
             .build());
-
-        reCiterPubmedTaskDefinition.addToExecutionRolePolicy(new PolicyStatement(PolicyStatementProps.builder()
-            .actions(Arrays.asList("ecr:GetDownloadUrlForLayer",
-                "ecr:BatchGetImage",
-                "ecr:GetAuthorizationToken",
-                "ecr:BatchCheckLayerAvailability"))
-            .effect(Effect.ALLOW)
-            .resources(Arrays.asList(reCiterPubmedEcrRep.getRepositoryArn()))
-            .sid("AccessToPullImage")
-        .build()));
+        
+        reCiterPubmedEcrRep.grantPull(reCiterPubmedTaskDefinition.obtainExecutionRole());
 
         ContainerDefinition reCiterPubmedNginxContainer = reCiterPubmedTaskDefinition.addContainer("reCiterPubmedNginxContainer", ContainerDefinitionProps.builder()
             .image(ContainerImage.fromRegistry("wcmcits/reciter-pubmed-nginx:latest"))
@@ -306,7 +290,7 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .build()))
             .containerName("reciter-pubmed")
             .healthCheck(HealthCheck.builder()
-                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost:5000/pubmed/ping || exit 1"))
+                .command(Arrays.asList("CMD-SHELL", "wget --spider -S http://localhost:5000/pubmed/ping || exit 1"))
                 .interval(Duration.minutes(5))
                 .retries(2)
                 .startPeriod(Duration.seconds(60))
@@ -349,120 +333,106 @@ public class ReCiterCDKECSStack extends NestedStack {
             .build());
 
         reCiterPubmedService.getConnections().allowFrom(reCiterEcsALB, Port.tcp(80), "Connection from ALB over port 80");
-       
-        final FargateTaskDefinition reCiterScopusTaskDefinition = new FargateTaskDefinition(this, "reCiterScopusTaskDefinition", FargateTaskDefinitionProps.builder()
-            .cpu(1024)
-            .memoryLimitMiB(2048)
-            .build());
-
-        reCiterScopusTaskDefinition.addToExecutionRolePolicy(new PolicyStatement(PolicyStatementProps.builder()
-            .actions(Arrays.asList("ecr:GetDownloadUrlForLayer",
-                "ecr:BatchGetImage",
-                "ecr:GetAuthorizationToken",
-                "ecr:BatchCheckLayerAvailability"))
-            .effect(Effect.ALLOW)
-            .resources(Arrays.asList(reCiterScopusEcrRepo.getRepositoryArn()))
-            .sid("AccessToPullImage")
-            .build()));
         
-        ContainerDefinition reCiterScopusNginxContainer = reCiterScopusTaskDefinition.addContainer("reCiterScopusNginxContainer", ContainerDefinitionProps.builder()
-            .image(ContainerImage.fromRegistry("wcmcits/reciter-scopus-nginx:latest"))
-            .logging(new AwsLogDriver(AwsLogDriverProps.builder()
-                .logGroup(new LogGroup(this, "reciterNginxScopusLogGroup", LogGroupProps.builder()
-                    .logGroupName("/ecs/reciter/scopus/nginx")
-                    .removalPolicy(RemovalPolicy.DESTROY)
-                    .retention(RetentionDays.ONE_MONTH)
+        if(System.getenv("INCLUDE_SCOPUS") != null && System.getenv("INCLUDE_SCOPUS").equals("true")) {
+            final FargateTaskDefinition reCiterScopusTaskDefinition = new FargateTaskDefinition(this, "reCiterScopusTaskDefinition", FargateTaskDefinitionProps.builder()
+                .cpu(1024)
+                .memoryLimitMiB(2048)
+                .build());
+            
+            reCiterScopusEcrRepo.grantPull(reCiterScopusTaskDefinition.obtainExecutionRole());
+            
+            ContainerDefinition reCiterScopusNginxContainer = reCiterScopusTaskDefinition.addContainer("reCiterScopusNginxContainer", ContainerDefinitionProps.builder()
+                .image(ContainerImage.fromRegistry("wcmcits/reciter-scopus-nginx:latest"))
+                .logging(new AwsLogDriver(AwsLogDriverProps.builder()
+                    .logGroup(new LogGroup(this, "reciterNginxScopusLogGroup", LogGroupProps.builder()
+                        .logGroupName("/ecs/reciter/scopus/nginx")
+                        .removalPolicy(RemovalPolicy.DESTROY)
+                        .retention(RetentionDays.ONE_MONTH)
+                        .build()))
+                    .streamPrefix("scopus-logs")
                     .build()))
-                .streamPrefix("scopus-logs")
-                .build()))
-            .containerName("reciter-scopus-nginx")
-            .healthCheck(HealthCheck.builder()
-                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost/nginx-health || exit 1"))
-                .interval(Duration.minutes(5))
-                .retries(2)
-                .startPeriod(Duration.seconds(60))
-                .timeout(Duration.seconds(30))
-                .build())
-            .memoryReservationMiB(400)
-            .memoryLimitMiB(548)
-            .taskDefinition(reCiterScopusTaskDefinition)
-            .cpu(200)
-            .build());
-        
-        ContainerDefinition reCiterScopusContainer = reCiterScopusTaskDefinition.addContainer("reCiterScopusContainer", ContainerDefinitionProps.builder()
-            .image(ContainerImage.fromRegistry("wcmcits/reciter-scopus:latest"))
-            .logging(new AwsLogDriver(AwsLogDriverProps.builder()
-                .logGroup(new LogGroup(this, "reciterScopusLogGroup", LogGroupProps.builder()
-                    .logGroupName("/ecs/reciter/scopus")
-                    .removalPolicy(RemovalPolicy.DESTROY)
-                    .retention(RetentionDays.ONE_MONTH)
+                .containerName("reciter-scopus-nginx")
+                .healthCheck(HealthCheck.builder()
+                    .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost/nginx-health || exit 1"))
+                    .interval(Duration.minutes(5))
+                    .retries(2)
+                    .startPeriod(Duration.seconds(60))
+                    .timeout(Duration.seconds(30))
+                    .build())
+                .memoryReservationMiB(400)
+                .memoryLimitMiB(548)
+                .taskDefinition(reCiterScopusTaskDefinition)
+                .cpu(200)
+                .build());
+            
+            ContainerDefinition reCiterScopusContainer = reCiterScopusTaskDefinition.addContainer("reCiterScopusContainer", ContainerDefinitionProps.builder()
+                .image(ContainerImage.fromRegistry("wcmcits/reciter-scopus:latest"))
+                .logging(new AwsLogDriver(AwsLogDriverProps.builder()
+                    .logGroup(new LogGroup(this, "reciterScopusLogGroup", LogGroupProps.builder()
+                        .logGroupName("/ecs/reciter/scopus")
+                        .removalPolicy(RemovalPolicy.DESTROY)
+                        .retention(RetentionDays.ONE_MONTH)
+                        .build()))
+                    .streamPrefix("scopus-logs")
                     .build()))
-                .streamPrefix("scopus-logs")
-                .build()))
-            .containerName("reciter-scopus")
-            .healthCheck(HealthCheck.builder()
-                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost:5000/scopus/ping || exit 1"))
-                .interval(Duration.minutes(5))
-                .retries(2)
-                .startPeriod(Duration.seconds(60))
-                .timeout(Duration.seconds(30))
-                .build())
-            .memoryReservationMiB(1500)
-            .memoryLimitMiB(1600)
-            .secrets(new HashMap<String, Secret>(){{
-                put("SCOPUS_API_KEY", Secret.fromSecretsManager(reciterScopusSecret, "SCOPUS_API_KEY"));
-                put("SCOPUS_INST_TOKEN", Secret.fromSecretsManager(reciterScopusSecret, "SCOPUS_INST_TOKEN"));
-            }})
-            .taskDefinition(reCiterScopusTaskDefinition)
-            .cpu(824)
-            .build());
+                .containerName("reciter-scopus")
+                .healthCheck(HealthCheck.builder()
+                    .command(Arrays.asList("CMD-SHELL", "wget --spider -S http://localhost:5000/scopus/ping || exit 1"))
+                    .interval(Duration.minutes(5))
+                    .retries(2)
+                    .startPeriod(Duration.seconds(60))
+                    .timeout(Duration.seconds(30))
+                    .build())
+                .memoryReservationMiB(1500)
+                .memoryLimitMiB(1600)
+                .secrets(new HashMap<String, Secret>(){{
+                    put("SCOPUS_API_KEY", Secret.fromSecretsManager(reciterScopusSecret, "SCOPUS_API_KEY"));
+                    put("SCOPUS_INST_TOKEN", Secret.fromSecretsManager(reciterScopusSecret, "SCOPUS_INST_TOKEN"));
+                }})
+                .taskDefinition(reCiterScopusTaskDefinition)
+                .cpu(824)
+                .build());
 
-        reCiterScopusNginxContainer.addPortMappings(PortMapping.builder()
-            .containerPort(80)
-            .protocol(Protocol.TCP)
-            .build());
+            reCiterScopusNginxContainer.addPortMappings(PortMapping.builder()
+                .containerPort(80)
+                .protocol(Protocol.TCP)
+                .build());
 
-        reCiterScopusContainer.addPortMappings(PortMapping.builder()
-            .containerPort(5000)
-            .protocol(Protocol.TCP)
-            .build());
+            reCiterScopusContainer.addPortMappings(PortMapping.builder()
+                .containerPort(5000)
+                .protocol(Protocol.TCP)
+                .build());
 
-        
+            
 
-        
-        reCiterScopusService = new FargateService(this, "reCiterScopusFargateService", FargateServiceProps.builder()
-            .cluster(reCiterCluster)
-            .taskDefinition(reCiterScopusTaskDefinition)
-            .desiredCount(1)
-            .serviceName("reciter-scopus")
-            .assignPublicIp(false)
-            .enableEcsManagedTags(true)
-            .healthCheckGracePeriod(Duration.seconds(60))
-            .platformVersion(FargatePlatformVersion.LATEST)
-            .propagateTags(PropagatedTagSource.SERVICE)
-            .vpcSubnets(SubnetSelection.builder()
-                .onePerAz(true)
-                .subnetType(SubnetType.PRIVATE)
-                .build())
-            .securityGroups(Arrays.asList(reciterClusterSg))
-            .build());
+            
+            reCiterScopusService = new FargateService(this, "reCiterScopusFargateService", FargateServiceProps.builder()
+                .cluster(reCiterCluster)
+                .taskDefinition(reCiterScopusTaskDefinition)
+                .desiredCount(1)
+                .serviceName("reciter-scopus")
+                .assignPublicIp(false)
+                .enableEcsManagedTags(true)
+                .healthCheckGracePeriod(Duration.seconds(60))
+                .platformVersion(FargatePlatformVersion.LATEST)
+                .propagateTags(PropagatedTagSource.SERVICE)
+                .vpcSubnets(SubnetSelection.builder()
+                    .onePerAz(true)
+                    .subnetType(SubnetType.PRIVATE)
+                    .build())
+                .securityGroups(Arrays.asList(reciterClusterSg))
+                .build());
 
-        reCiterScopusService.getConnections().allowFrom(reCiterEcsALB, Port.tcp(80), "Connection from ALB over port 80");
+            reCiterScopusService.getConnections().allowFrom(reCiterEcsALB, Port.tcp(80), "Connection from ALB over port 80");
+        }
 
         final FargateTaskDefinition reCiterPubManagerTaskDefinition = new FargateTaskDefinition(this, "reCiterPubManagerTaskDefinition", FargateTaskDefinitionProps.builder()
             .cpu(1024)
             .memoryLimitMiB(2048)
             .build());
-
-        reCiterPubManagerTaskDefinition.addToExecutionRolePolicy(new PolicyStatement(PolicyStatementProps.builder()
-            .actions(Arrays.asList("ecr:GetDownloadUrlForLayer",
-                "ecr:BatchGetImage",
-                "ecr:GetAuthorizationToken",
-                "ecr:BatchCheckLayerAvailability"))
-            .effect(Effect.ALLOW)
-            .resources(Arrays.asList(reCiterPubManagerEcrRepo.getRepositoryArn()))
-            .sid("AccessToPullImage")
-            .build()));
+        
+        reCiterPubManagerEcrRepo.grantPull(reCiterPubManagerTaskDefinition.obtainExecutionRole());
 
         
         ContainerDefinition reCiterPubManagerContainer = reCiterPubManagerTaskDefinition.addContainer("reCiterScopusContainer", ContainerDefinitionProps.builder()
@@ -476,13 +446,13 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .streamPrefix("pub-manager-logs")
                 .build()))
             .containerName("reciter-pub-manager")
-            /*.healthCheck(HealthCheck.builder()
-                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost || exit 1"))
+            .healthCheck(HealthCheck.builder()
+                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost:8081/login || exit 1"))
                 .interval(Duration.minutes(5))
                 .retries(2)
                 .startPeriod(Duration.seconds(60))
                 .timeout(Duration.seconds(30))
-                .build())*/
+                .build())
             .memoryReservationMiB(1800)
             .memoryLimitMiB(2048)
             .taskDefinition(reCiterPubManagerTaskDefinition)
@@ -490,7 +460,7 @@ public class ReCiterCDKECSStack extends NestedStack {
             .build());
 
         reCiterPubManagerContainer.addPortMappings(PortMapping.builder()
-            .containerPort(80)
+            .containerPort(8081)
             .protocol(Protocol.TCP)
             .build());
 
@@ -537,19 +507,19 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .build()))
             .priority(2)
             .build());
-        
-        reciterListener.addAction("reciter-scopus-redirect-to-swagger", AddApplicationActionProps.builder()
-            .conditions(Arrays.asList(ListenerCondition.pathPatterns(Arrays.asList("/scopus"))))
-            .action(ListenerAction.redirect(RedirectOptions.builder()
-                .host("#{host}")
-                .port("80")
-                .path("/#{path}/swagger-ui/index.html")
-                .query("#{query}")
-                .permanent(true)
-                .build()))
-            .priority(3)
-            .build());
-
+        if(System.getenv("INCLUDE_SCOPUS") != null && System.getenv("INCLUDE_SCOPUS").equals("true")) {
+            reciterListener.addAction("reciter-scopus-redirect-to-swagger", AddApplicationActionProps.builder()
+                .conditions(Arrays.asList(ListenerCondition.pathPatterns(Arrays.asList("/scopus"))))
+                .action(ListenerAction.redirect(RedirectOptions.builder()
+                    .host("#{host}")
+                    .port("80")
+                    .path("/#{path}/swagger-ui/index.html")
+                    .query("#{query}")
+                    .permanent(true)
+                    .build()))
+                .priority(3)
+                .build());
+        }
         //Path based redirect to reciter
         reciterListener.addTargets("reciter", AddApplicationTargetsProps.builder()
             .conditions(Arrays.asList(ListenerCondition.pathPatterns(Arrays.asList("/reciter*"))))
@@ -586,24 +556,26 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .build())
             .protocol(ApplicationProtocol.HTTP)
             .build());
-        //Path based redirect to reciter-scopus
-        reciterListener.addTargets("reciter-scopus", AddApplicationTargetsProps.builder()
-            .conditions(Arrays.asList(ListenerCondition.pathPatterns(Arrays.asList("/scopus*"))))
-            .priority(6)
-            .targets(Arrays.asList(reCiterScopusService))
-            .port(80)
-            .targetGroupName("cdk-reciter-scopus-tg")
-            .protocolVersion(ApplicationProtocolVersion.HTTP1)
-            .healthCheck(software.amazon.awscdk.services.elasticloadbalancingv2.HealthCheck.builder()
-                .enabled(true)
-                .healthyThresholdCount(3)
-                .interval(Duration.seconds(60))
-                .path("/scopus/ping")
-                .protocol(software.amazon.awscdk.services.elasticloadbalancingv2.Protocol.HTTP)
-                .unhealthyThresholdCount(3)
-                .build())
-            .protocol(ApplicationProtocol.HTTP)
-            .build());
+        if(System.getenv("INCLUDE_SCOPUS") != null && System.getenv("INCLUDE_SCOPUS").equals("true")) {
+            //Path based redirect to reciter-scopus
+            reciterListener.addTargets("reciter-scopus", AddApplicationTargetsProps.builder()
+                .conditions(Arrays.asList(ListenerCondition.pathPatterns(Arrays.asList("/scopus*"))))
+                .priority(6)
+                .targets(Arrays.asList(reCiterScopusService))
+                .port(80)
+                .targetGroupName("cdk-reciter-scopus-tg")
+                .protocolVersion(ApplicationProtocolVersion.HTTP1)
+                .healthCheck(software.amazon.awscdk.services.elasticloadbalancingv2.HealthCheck.builder()
+                    .enabled(true)
+                    .healthyThresholdCount(3)
+                    .interval(Duration.seconds(60))
+                    .path("/scopus/ping")
+                    .protocol(software.amazon.awscdk.services.elasticloadbalancingv2.Protocol.HTTP)
+                    .unhealthyThresholdCount(3)
+                    .build())
+                .protocol(ApplicationProtocol.HTTP)
+                .build());
+        }
         //Path based redirect to reciter-pub-manager
         reciterListener.addTargets("reciter-pub-manager", AddApplicationTargetsProps.builder()
             .conditions(Arrays.asList(ListenerCondition.pathPatterns(Arrays.asList("/*"))))
@@ -616,7 +588,7 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .enabled(true)
                 .healthyThresholdCount(3)
                 .interval(Duration.seconds(60))
-                .path("/")
+                .path("/login")
                 .protocol(software.amazon.awscdk.services.elasticloadbalancingv2.Protocol.HTTP)
                 .unhealthyThresholdCount(3)
                 .build())
@@ -652,21 +624,22 @@ public class ReCiterCDKECSStack extends NestedStack {
             .targetUtilizationPercent(85)
             .scaleInCooldown(Duration.minutes(10))
             .build());
+        if(System.getenv("INCLUDE_SCOPUS") != null && System.getenv("INCLUDE_SCOPUS").equals("true")) {
+            ScalableTaskCount reCiterScopusAutoScaling =  reCiterScopusService.autoScaleTaskCount(EnableScalingProps.builder()
+                .minCapacity(1)
+                .maxCapacity(2)
+                .build());
 
-        ScalableTaskCount reCiterScopusAutoScaling =  reCiterScopusService.autoScaleTaskCount(EnableScalingProps.builder()
-            .minCapacity(1)
-            .maxCapacity(2)
-            .build());
-
-        reCiterScopusAutoScaling.scaleOnCpuUtilization("reciterScopusScaleOnCPUUtilization", CpuUtilizationScalingProps.builder()
-            .targetUtilizationPercent(85)
-            .scaleInCooldown(Duration.minutes(10))
-            .build());
-        
-        reCiterScopusAutoScaling.scaleOnMemoryUtilization("reciterScopusScaleOnMemoryUtilization", MemoryUtilizationScalingProps.builder()
-            .targetUtilizationPercent(85)
-            .scaleInCooldown(Duration.minutes(10))
-            .build());
+            reCiterScopusAutoScaling.scaleOnCpuUtilization("reciterScopusScaleOnCPUUtilization", CpuUtilizationScalingProps.builder()
+                .targetUtilizationPercent(85)
+                .scaleInCooldown(Duration.minutes(10))
+                .build());
+            
+            reCiterScopusAutoScaling.scaleOnMemoryUtilization("reciterScopusScaleOnMemoryUtilization", MemoryUtilizationScalingProps.builder()
+                .targetUtilizationPercent(85)
+                .scaleInCooldown(Duration.minutes(10))
+                .build());
+        }
         
         ScalableTaskCount reCiterPubManagerAutoScaling =  reCiterPubManagerService.autoScaleTaskCount(EnableScalingProps.builder()
             .minCapacity(1)
@@ -744,30 +717,31 @@ public class ReCiterCDKECSStack extends NestedStack {
             .build());
         
         reciterPubmedHighMemoryUtilAlarm.addAlarmAction(new SnsAction(reciterAlarmTopic));
-
-        final Alarm reciterScopusHighCpuUtilAlarm = new Alarm(this, "reciterScopusHighCpuUtilAlarm", AlarmProps.builder()
-            .alarmName("cdk-reciter-scopus-cpu-high")
-            .alarmDescription("This alarm is for high cpu utilization for ReCiter-Scopus")
-            .metric(reCiterScopusService.metricCpuUtilization())
-            .datapointsToAlarm(1)
-            .evaluationPeriods(1)
-            .threshold(85)
-            .treatMissingData(TreatMissingData.MISSING)
-            .build());
-        
-        reciterScopusHighCpuUtilAlarm.addAlarmAction(new SnsAction(reciterAlarmTopic));
-        
-        final Alarm reciterScopusHighMemoryUtilAlarm = new Alarm(this, "reciterScopusHighMemoryUtilAlarm", AlarmProps.builder()
-            .alarmName("cdk-reciter-scopus-memory-high")
-            .alarmDescription("This alarm is for high memory utilization for ReCiter-Scopus")
-            .metric(reCiterScopusService.metricMemoryUtilization())
-            .datapointsToAlarm(1)
-            .evaluationPeriods(1)
-            .threshold(85)
-            .treatMissingData(TreatMissingData.MISSING)
-            .build());
-        
-        reciterScopusHighMemoryUtilAlarm.addAlarmAction(new SnsAction(reciterAlarmTopic));
+        if(System.getenv("INCLUDE_SCOPUS") != null && System.getenv("INCLUDE_SCOPUS").equals("true")) {
+            final Alarm reciterScopusHighCpuUtilAlarm = new Alarm(this, "reciterScopusHighCpuUtilAlarm", AlarmProps.builder()
+                .alarmName("cdk-reciter-scopus-cpu-high")
+                .alarmDescription("This alarm is for high cpu utilization for ReCiter-Scopus")
+                .metric(reCiterScopusService.metricCpuUtilization())
+                .datapointsToAlarm(1)
+                .evaluationPeriods(1)
+                .threshold(85)
+                .treatMissingData(TreatMissingData.MISSING)
+                .build());
+            
+            reciterScopusHighCpuUtilAlarm.addAlarmAction(new SnsAction(reciterAlarmTopic));
+            
+            final Alarm reciterScopusHighMemoryUtilAlarm = new Alarm(this, "reciterScopusHighMemoryUtilAlarm", AlarmProps.builder()
+                .alarmName("cdk-reciter-scopus-memory-high")
+                .alarmDescription("This alarm is for high memory utilization for ReCiter-Scopus")
+                .metric(reCiterScopusService.metricMemoryUtilization())
+                .datapointsToAlarm(1)
+                .evaluationPeriods(1)
+                .threshold(85)
+                .treatMissingData(TreatMissingData.MISSING)
+                .build());
+            
+            reciterScopusHighMemoryUtilAlarm.addAlarmAction(new SnsAction(reciterAlarmTopic));
+        }
 
         final Alarm reciterPubManagerHighCpuUtilAlarm = new Alarm(this, "reciterPubManagerHighCpuUtilAlarm", AlarmProps.builder()
             .alarmName("cdk-reciter-pub-manager-cpu-high")
@@ -810,12 +784,13 @@ public class ReCiterCDKECSStack extends NestedStack {
             .exportName("reciterPubmedUrl")
             .value(reCiterEcsALB.getLoadBalancerDnsName() + "/pubmed")
             .build();
-
-        CfnOutput.Builder.create(this, "reciterScopusUrl")
-            .description("ReCiter Scopus URL")
-            .exportName("reciterScopusUrl")
-            .value(reCiterEcsALB.getLoadBalancerDnsName() + "/scopus")
-            .build();
+        if(System.getenv("INCLUDE_SCOPUS") != null && System.getenv("INCLUDE_SCOPUS").equals("true")) {
+            CfnOutput.Builder.create(this, "reciterScopusUrl")
+                .description("ReCiter Scopus URL")
+                .exportName("reciterScopusUrl")
+                .value(reCiterEcsALB.getLoadBalancerDnsName() + "/scopus")
+                .build();
+        }
 
         CfnOutput.Builder.create(this, "reciterPubManagerUrl")
             .description("ReCiter Pub Manager URL")
