@@ -24,11 +24,11 @@ public class ReCiterCdkStack extends Stack {
             .build());
         NestedStack.isNestedStack(reCiterCdkSecretsManagerStack);
 
-        /*ReCiterCdkRDSStack reCiterCdkRDSStack = new ReCiterCdkRDSStack(this, "reCiterCdkRDSStack", NestedStackProps.builder()
+        ReCiterCdkRDSStack reCiterCdkRDSStack = new ReCiterCdkRDSStack(this, "reCiterCdkRDSStack", NestedStackProps.builder()
             .removalPolicy(RemovalPolicy.DESTROY)
             .build(), 
             reCiterCDKVPCStack.getVpc(), reCiterCDKVPCStack.getPrivateSubnetGroup());
-        reCiterCdkRDSStack.addDependency(reCiterCDKVPCStack, "RDS is dependent on VPC Stack");*/
+        reCiterCdkRDSStack.addDependency(reCiterCDKVPCStack, "RDS is dependent on VPC Stack");
         
 
         ReCiterCDKECRStack reCiterCDKECRStack = new ReCiterCDKECRStack(this, "reCiterCDKECRStack", NestedStackProps.builder()
@@ -48,12 +48,12 @@ public class ReCiterCdkStack extends Stack {
         reCiterCDKECSStack.addDependency(reCiterCDKECRStack, "ECR repo is needed for ECS Tasks");
         
 
-        /*ReCiterCdkWAFStack reCiterCdkWAFStack = new ReCiterCdkWAFStack(this, "reCiterCdkWAFStack", NestedStackProps.builder()
+        ReCiterCdkWAFStack reCiterCdkWAFStack = new ReCiterCdkWAFStack(this, "reCiterCdkWAFStack", NestedStackProps.builder()
             .removalPolicy(RemovalPolicy.DESTROY)
             .build(), 
             reCiterCDKECSStack.getAlb());
         NestedStack.isNestedStack(reCiterCdkWAFStack);
-        reCiterCdkWAFStack.addDependency(reCiterCDKECSStack, "WAF dependent on ALB");*/
+        reCiterCdkWAFStack.addDependency(reCiterCDKECSStack, "WAF dependent on ALB");
 
         ReCiterCdkPipelineStack reCiterCdkPipelineStack = new ReCiterCdkPipelineStack(this, "reCiterCdkCodeBuildStack", NestedStackProps.builder()
             .removalPolicy(RemovalPolicy.DESTROY)
