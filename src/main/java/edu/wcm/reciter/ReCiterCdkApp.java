@@ -22,7 +22,7 @@ public class ReCiterCdkApp {
     }
     public static void main(final String[] args) {
         App app = new App();
-        Environment envReCiter = makeEnv(null, "us-east-2");
+        Environment envReCiter = makeEnv(null, null);
         if((System.getenv("ADMIN_API_KEY") == null || System.getenv("ADMIN_API_KEY").isEmpty())
         ||
         (System.getenv("CONSUMER_API_KEY") == null || System.getenv("CONSUMER_API_KEY").isEmpty())
