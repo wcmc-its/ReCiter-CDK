@@ -40,6 +40,7 @@ public class ReCiterCdkRDSStack extends NestedStack {
                 .build()))
             .vpc(vpc)
             .allocatedStorage(50)
+            .publiclyAccessible(true)
             .allowMajorVersionUpgrade(true)
             .autoMinorVersionUpgrade(true)
             .backupRetention(Duration.days(7))
@@ -52,7 +53,6 @@ public class ReCiterCdkRDSStack extends NestedStack {
             .multiAz(false)
             .licenseModel(LicenseModel.GENERAL_PUBLIC_LICENSE)
             .port(3306)
-            .publiclyAccessible(false)
             .removalPolicy(RemovalPolicy.DESTROY)
             .storageType(StorageType.GP2)
             .subnetGroup(privateDbSubnetGroup)
@@ -92,6 +92,12 @@ public class ReCiterCdkRDSStack extends NestedStack {
             .description("ReCiter Report DB password")
             .exportName("reCiterReportDBPassword")
             .value(reciterDb.getSecret().secretValueFromJson("password").toString())
+            .build();
+
+        CfnOutput.Builder.create(this, "reCiterReportDBUsername")
+            .description("ReCiter Report DB username")
+            .exportName("reCiterReportDBUsername")
+            .value("admin")
             .build();
     }
     
