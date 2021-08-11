@@ -37,6 +37,9 @@ import software.amazon.awscdk.services.codepipeline.actions.GitHubSourceAction;
 import software.amazon.awscdk.services.codepipeline.actions.GitHubSourceActionProps;
 import software.amazon.awscdk.services.codepipeline.actions.ManualApprovalAction;
 import software.amazon.awscdk.services.codepipeline.actions.ManualApprovalActionProps;
+import software.amazon.awscdk.services.ec2.IVpc;
+import software.amazon.awscdk.services.ec2.SubnetSelection;
+import software.amazon.awscdk.services.ec2.SubnetType;
 import software.amazon.awscdk.services.ecr.Repository;
 import software.amazon.awscdk.services.ecs.Cluster;
 import software.amazon.awscdk.services.ecs.FargateService;
@@ -61,12 +64,12 @@ public class ReCiterCdkPipelineStack extends NestedStack {
     private Artifact reCiterPubManagerbuildOutput = new Artifact();
     
     public ReCiterCdkPipelineStack(final Construct parent, final String id) {
-        this(parent, id, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        this(parent, id, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
     }
 
     public ReCiterCdkPipelineStack(final Construct parent, final String id, final NestedStackProps props, Cluster reCiterCluster, Repository reCiterEcrRepo, Repository reCiterPubmedEcrRepo, Repository reCiterScopusEcrRepo, Repository reCiterPubManagerEcrRepo, Topic reCiterTopic, 
     FargateService reCiterPubmedService, FargateService reCiterScopusService, FargateService reCiterService, FargateService reCiterPubManagerService,
-    ISecret reCiterSecret, ApplicationLoadBalancer reCiterAlb) {
+    ISecret reCiterSecret, ApplicationLoadBalancer reCiterAlb, IVpc vpc) {
         super(parent, id, props);
 
         //CodeBuild Project for ReCiter-Pubmed
@@ -81,6 +84,11 @@ public class ReCiterCdkPipelineStack extends NestedStack {
                 .build()))
             .badge(true)
             .cache(Cache.local(LocalCacheMode.DOCKER_LAYER))
+            .vpc(vpc)
+            .subnetSelection(SubnetSelection.builder()
+                .onePerAz(true)
+                .subnetType(SubnetType.PRIVATE)
+                .build())
             .environment(BuildEnvironment.builder()
                 .buildImage(LinuxBuildImage.AMAZON_LINUX_2_3)
                 .computeType(ComputeType.SMALL)
@@ -149,6 +157,11 @@ public class ReCiterCdkPipelineStack extends NestedStack {
                     .build())
                 .badge(true)
                 .cache(Cache.local(LocalCacheMode.DOCKER_LAYER))
+                .vpc(vpc)
+                .subnetSelection(SubnetSelection.builder()
+                    .onePerAz(true)
+                    .subnetType(SubnetType.PRIVATE)
+                    .build())
                 .environmentVariables(new HashMap<String, BuildEnvironmentVariable>(){{
                     put("ECR_REPO_URI", BuildEnvironmentVariable.builder()
                             .type(BuildEnvironmentVariableType.PLAINTEXT)
@@ -207,6 +220,11 @@ public class ReCiterCdkPipelineStack extends NestedStack {
                 .build()))
             .badge(true)
             .cache(Cache.local(LocalCacheMode.DOCKER_LAYER))
+            .vpc(vpc)
+                .subnetSelection(SubnetSelection.builder()
+                    .onePerAz(true)
+                    .subnetType(SubnetType.PRIVATE)
+                    .build())
             .environment(BuildEnvironment.builder()
                 .buildImage(LinuxBuildImage.AMAZON_LINUX_2_3)
                 .computeType(ComputeType.SMALL)
@@ -269,6 +287,11 @@ public class ReCiterCdkPipelineStack extends NestedStack {
                 .build()))
             .badge(true)
             .cache(Cache.local(LocalCacheMode.DOCKER_LAYER))
+            .vpc(vpc)
+                .subnetSelection(SubnetSelection.builder()
+                    .onePerAz(true)
+                    .subnetType(SubnetType.PRIVATE)
+                    .build())
             .environment(BuildEnvironment.builder()
                 .buildImage(LinuxBuildImage.AMAZON_LINUX_2_3)
                 .computeType(ComputeType.SMALL)
