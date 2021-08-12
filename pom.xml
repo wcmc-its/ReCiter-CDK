@@ -3,9 +3,32 @@
          xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.myorg</groupId>
+    <groupId>edu.wcm.reciter</groupId>
     <artifactId>reciter-cdk</artifactId>
     <version>1.0.0</version>
+    <url>https://github.com/wcmc-its/ReCiter-CDK</url>
+
+    <organization>
+		<url>https://github.com/wcmc-its</url>
+		<name>Weill Cornell Medicine ITS</name>
+	</organization>
+
+	<licenses>
+		<license>
+			<name>The Apache License, Version 2.0</name>
+			<url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+		</license>
+	</licenses>
+
+	<developers>
+		<developer>
+			<name>Sarbajit Dutta</name>
+			<email>szd2013@med.cornell.edu</email>
+			<organization>Weill Cornell Medicine ITS</organization>
+			<organizationUrl>https://github.com/wcmc-its</organizationUrl>
+			<timezone>GMT-5</timezone>
+		</developer>
+	</developers>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
