@@ -108,6 +108,7 @@ Use `export <environment variable name>=<value>`
     - This should take some time and you can login to AWS and go to Cloudformation service to see the progress. After it is installed you can go search for ECS and click on Stack and go to Output section to see the url for ReCiter and its components. 
     ![output user](/files/CloudFormation.png)
     - Remember all the resources here will be publicly accessible over the internet. Although we have Web appllication firewall providing necessary security against malicious bots and others. It is advisable to use it using SSL and valid certificate.
+    - You will receive the email you entered for `ALARM_EMAIL` click on that to confirm the subscription. You will also receive emails when pipeline runs to get approval. You have to approve all the pipeline by clicking the links you get in the email.
 ### Enjoy ReCiter - For any questions email Sarbajit Dutta(szd2013@med.cornell.edu)
 
 ## Useful commands
