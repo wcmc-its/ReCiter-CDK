@@ -105,7 +105,8 @@ Use `export <environment variable name>=<value>`
     - Go to your terminal where you have cloned this repository. If not cloned then use `git clone https://github.com/wcmc-its/ReCiter-CDK.git`
     - Run `cdk synth` and this will synthesize all the cloudformation template for you in `cdk.out` folder. If also if you have not environment variables properly it will prompt you.
     - Run `cdk deploy --profile reciter` reciter is thr profile name you gave when you set up the aws-cli with `aws configure --profile reciter`
-    - This should take some time and you can login to AWS and go to Cloudformation to see the progress. After it is installed you can go to the ECS Stack Output section to see the url for ReCiter and its components.
+    - This should take some time and you can login to AWS and go to Cloudformation service to see the progress. After it is installed you can go search for ECS and click on Stack and go to Output section to see the url for ReCiter and its components. 
+    ![output user](/files/CloudFormation.png)
     - Remember all the resources here will be publicly accessible over the internet. Although we have Web appllication firewall providing necessary security against malicious bots and others. It is advisable to use it using SSL and valid certificate.
 ### Enjoy ReCiter - For any questions email Sarbajit Dutta(szd2013@med.cornell.edu)
 
