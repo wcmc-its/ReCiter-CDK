@@ -22,7 +22,7 @@ public class ReCiterCdkStack extends Stack {
         ReCiterCdkRDSStack reCiterCdkRDSStack = new ReCiterCdkRDSStack(this, "reCiterCdkRDSStack", NestedStackProps.builder()
             .removalPolicy(RemovalPolicy.DESTROY)
             .build(), 
-            reCiterCDKVPCStack.getVpc(), reCiterCDKVPCStack.getPrivateSubnetGroup());
+            reCiterCDKVPCStack.getVpc(), reCiterCDKVPCStack.getPrivateSubnetGroup(), reCiterCDKVPCStack.getPublicSubnetGroup());
         NestedStack.isNestedStack(reCiterCdkRDSStack);    
         reCiterCdkRDSStack.addDependency(reCiterCDKVPCStack, "RDS is dependent on VPC Stack");
 

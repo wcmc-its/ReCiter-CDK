@@ -31,6 +31,7 @@ public class ReCiterCDKVPCStack extends NestedStack {
 
     private final IVpc reciterVpc;
     private final SubnetGroup privateSubnetGroup;
+    private final SubnetGroup publicSubnetGroup;
     
     public ReCiterCDKVPCStack(final Construct parent, final String id) {
         this(parent, id, null);
@@ -72,7 +73,7 @@ public class ReCiterCDKVPCStack extends NestedStack {
             .build());
         
         
-        final SubnetGroup publicSubnetGroup = new SubnetGroup(this, "publicSubnetGroup", SubnetGroupProps.builder()
+        publicSubnetGroup = new SubnetGroup(this, "publicSubnetGroup", SubnetGroupProps.builder()
             .description("This subnet group is for public subnets in ReCiter VPC")
             .removalPolicy(RemovalPolicy.DESTROY)
             .subnetGroupName("reciter-public-subnet-group")
@@ -125,5 +126,9 @@ public class ReCiterCDKVPCStack extends NestedStack {
 
     public SubnetGroup getPrivateSubnetGroup() {
         return this.privateSubnetGroup;
+    }
+
+    public SubnetGroup getPublicSubnetGroup() {
+        return this.publicSubnetGroup;
     }
 }

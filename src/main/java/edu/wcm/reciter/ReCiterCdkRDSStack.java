@@ -31,10 +31,10 @@ public class ReCiterCdkRDSStack extends NestedStack {
     private final DatabaseInstance reciterDb;
     
     public ReCiterCdkRDSStack(final Construct parent, final String id) {
-        this(parent, id, null, null, null);
+        this(parent, id, null, null, null, null);
     }
 
-    public ReCiterCdkRDSStack(final Construct parent, final String id, final NestedStackProps props, IVpc vpc, SubnetGroup privateDbSubnetGroup) {
+    public ReCiterCdkRDSStack(final Construct parent, final String id, final NestedStackProps props, IVpc vpc, SubnetGroup privateDbSubnetGroup, SubnetGroup publicDbSubnetGroup) {
         super(parent, id, props);
 
         reciterDb = new DatabaseInstance(this, "reciterDb", DatabaseInstanceProps.builder()
@@ -58,7 +58,7 @@ public class ReCiterCdkRDSStack extends NestedStack {
             .port(3306)
             .removalPolicy(RemovalPolicy.DESTROY)
             .storageType(StorageType.GP2)
-            .subnetGroup(privateDbSubnetGroup)
+            .subnetGroup(publicDbSubnetGroup)
             .preferredBackupWindow("01:00-02:00")
             .preferredMaintenanceWindow("Sat:03:00-Sat:05:00")
             .credentials(Credentials.fromSecret(Secret.Builder.create(this, "reciter-report-secret")

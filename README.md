@@ -88,7 +88,7 @@ Use `export <environment variable name>=<value>`
    `aws.s3.use.dynamic.bucketName=true`
    - Under commit message, enter `Dynamic bucket generation`. 
    - Click `Commit`
-   - If you dont want to use scopus(or dont have a subscription) then ddit the file and find `use.scopus.articles` and set that to false:
+   - If you dont want to use scopus(or dont have a subscription) then edit the file and find `use.scopus.articles` and set that to false:
    `use.scopus.articles=false`
    - Under commit message, enter `set scopus flag`. 
    - Click `Commit`
@@ -100,10 +100,14 @@ Use `export <environment variable name>=<value>`
 - Fork the ReCiter-Publication-Manager repository to you personal GitHub account.
    - Go to the [ReCiter publication manager repository](https://github.com/wcmc-its/ReCiter-Publication-Manager)
    - Click on the `Fork` button. 
+- Fork the ReCiter-Machine-Learning-Analysis repository to you personal GitHub account.
+   - Go to the [ReCiter machine learning analysis repository](https://github.com/wcmc-its/ReCiter-Machine-Learning-Analysis)
+   - Click on the `Fork` button. 
 
 - We are all set to do the installation
     - Go to your terminal where you have cloned this repository. If not cloned then use `git clone https://github.com/wcmc-its/ReCiter-CDK.git`
     - Run `cdk synth` and this will synthesize all the cloudformation template for you in `cdk.out` folder. If also if you have not environment variables properly it will prompt you.
+    - Run `cdk bootstrap` to create a s3 bucket to house the templates.
     - Run `cdk deploy --profile reciter` reciter is thr profile name you gave when you set up the aws-cli with `aws configure --profile reciter`
     - This should take some time and you can login to AWS and go to Cloudformation service to see the progress. After it is installed you can go search for ECS and click on Stack and go to Output section to see the url for ReCiter and its components. 
     ![output user](/files/CloudFormation.png)
