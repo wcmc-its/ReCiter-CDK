@@ -2,8 +2,6 @@ package edu.wcm.reciter;
 
 import java.util.HashMap;
 
-import com.sun.tools.sjavac.Log;
-
 import software.amazon.awscdk.core.App;
 import software.amazon.awscdk.core.Environment;
 import software.amazon.awscdk.core.StackProps;
