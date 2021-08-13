@@ -13,6 +13,7 @@ import software.amazon.awscdk.services.ec2.IVpc;
 import software.amazon.awscdk.services.ec2.InstanceClass;
 import software.amazon.awscdk.services.ec2.InstanceSize;
 import software.amazon.awscdk.services.ec2.InstanceType;
+import software.amazon.awscdk.services.ec2.Port;
 import software.amazon.awscdk.services.rds.Credentials;
 import software.amazon.awscdk.services.rds.DatabaseInstance;
 import software.amazon.awscdk.services.rds.DatabaseInstanceEngine;
@@ -26,6 +27,8 @@ import software.amazon.awscdk.services.secretsmanager.Secret;
 import software.amazon.awscdk.services.secretsmanager.SecretStringGenerator;
 
 public class ReCiterCdkRDSStack extends NestedStack {
+
+    private final DatabaseInstance reciterDb;
     
     public ReCiterCdkRDSStack(final Construct parent, final String id) {
         this(parent, id, null, null, null);
@@ -34,7 +37,7 @@ public class ReCiterCdkRDSStack extends NestedStack {
     public ReCiterCdkRDSStack(final Construct parent, final String id, final NestedStackProps props, IVpc vpc, SubnetGroup privateDbSubnetGroup) {
         super(parent, id, props);
 
-        final DatabaseInstance reciterDb = new DatabaseInstance(this, "reciterDb", DatabaseInstanceProps.builder()
+        reciterDb = new DatabaseInstance(this, "reciterDb", DatabaseInstanceProps.builder()
             .engine(DatabaseInstanceEngine.mariaDb(MariaDbInstanceEngineProps.builder()
                 .version(MariaDbEngineVersion.VER_10_5_9)
                 .build()))
@@ -75,6 +78,8 @@ public class ReCiterCdkRDSStack extends NestedStack {
             .secretName("reciter-report-secret")
             .build()))
             .build());
+
+        reciterDb.getConnections().allowFromAnyIpv4(Port.tcp(3306), "Allow database connection from any IPv4. Make sure to restrict this.");
             
         //Tagging for all Resources
         Tags.of(this).add("application", "reciter");
@@ -99,6 +104,10 @@ public class ReCiterCdkRDSStack extends NestedStack {
             .exportName("reCiterReportDBUsername")
             .value("admin")
             .build();
+    }
+
+    public DatabaseInstance getReciterDb() {
+        return this.reciterDb;
     }
     
 }

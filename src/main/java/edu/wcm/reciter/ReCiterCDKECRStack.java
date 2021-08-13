@@ -20,6 +20,7 @@ public class ReCiterCDKECRStack extends NestedStack {
     private final Repository reciterPubmedRepo;
     private Repository reciterScopusRepo;
     private final Repository reciterPubManagerRepo;
+    private final Repository reciterMachineLearningAnalysisRepo;
     
     public ReCiterCDKECRStack(final Construct parent, final String id) {
         this(parent, id, null);
@@ -73,10 +74,24 @@ public class ReCiterCDKECRStack extends NestedStack {
                 .build());
         }
 
-        //ReCiter ECR repo
+        //ReCiter Pub Manager ECR repo
         reciterPubManagerRepo = new Repository(this, "reciterPubManagerRepo", RepositoryProps.builder()
             .imageScanOnPush(true)
             .repositoryName("reciter/pub-manager")
+            .removalPolicy(RemovalPolicy.DESTROY)
+            .lifecycleRules(Arrays.asList(LifecycleRule.builder()
+                .description("remove old images")
+                .maxImageCount(10)
+                .rulePriority(1)
+                .tagStatus(TagStatus.ANY)
+                .build()))
+            .imageTagMutability(TagMutability.MUTABLE)
+            .build());
+
+        //ReCiter Machine Learning Analysis ECR repo
+        reciterMachineLearningAnalysisRepo = new Repository(this, "reciterMachineLearningAnalysisRepo", RepositoryProps.builder()
+            .imageScanOnPush(true)
+            .repositoryName("reciter/machine-learning-analysis")
             .removalPolicy(RemovalPolicy.DESTROY)
             .lifecycleRules(Arrays.asList(LifecycleRule.builder()
                 .description("remove old images")
@@ -117,6 +132,12 @@ public class ReCiterCDKECRStack extends NestedStack {
             .exportName("ecrRepoUrlReCiterPubManager")
             .value(reciterPubManagerRepo.getRepositoryUri())
             .build();
+        
+        CfnOutput.Builder.create(this, "ecrRepoUrlReCiterMachineLearningAnalysis")
+            .description("ECR Repo url for ReCiter-Machine-Learning-Analysis")
+            .exportName("ecrRepoUrlReCiterMachineLearningAnalysis")
+            .value(reciterMachineLearningAnalysisRepo.getRepositoryUri())
+            .build();
     }
 
     public Repository getReCiterEcrRepo() {
@@ -130,5 +151,8 @@ public class ReCiterCDKECRStack extends NestedStack {
     }
     public Repository getReCiterPubManagerEcrRepo() {
         return this.reciterPubManagerRepo;
+    }
+    public Repository getReCiterMachineLearningAnalysisEcrRepo() {
+        return this.reciterMachineLearningAnalysisRepo;
     }
 }

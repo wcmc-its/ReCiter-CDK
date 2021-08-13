@@ -10,7 +10,9 @@ import software.amazon.awscdk.core.NestedStack;
 import software.amazon.awscdk.core.NestedStackProps;
 import software.amazon.awscdk.core.RemovalPolicy;
 import software.amazon.awscdk.core.Tags;
+import software.amazon.awscdk.services.applicationautoscaling.CronOptions;
 import software.amazon.awscdk.services.applicationautoscaling.EnableScalingProps;
+import software.amazon.awscdk.services.applicationautoscaling.Schedule;
 import software.amazon.awscdk.services.cloudwatch.Alarm;
 import software.amazon.awscdk.services.cloudwatch.AlarmProps;
 import software.amazon.awscdk.services.cloudwatch.TreatMissingData;
@@ -28,6 +30,7 @@ import software.amazon.awscdk.services.ecs.AwsLogDriverProps;
 import software.amazon.awscdk.services.ecs.Cluster;
 import software.amazon.awscdk.services.ecs.ClusterProps;
 import software.amazon.awscdk.services.ecs.ContainerDefinition;
+import software.amazon.awscdk.services.ecs.ContainerDefinitionOptions;
 import software.amazon.awscdk.services.ecs.ContainerDefinitionProps;
 import software.amazon.awscdk.services.ecs.ContainerImage;
 import software.amazon.awscdk.services.ecs.CpuUtilizationScalingProps;
@@ -43,6 +46,10 @@ import software.amazon.awscdk.services.ecs.PropagatedTagSource;
 import software.amazon.awscdk.services.ecs.Protocol;
 import software.amazon.awscdk.services.ecs.ScalableTaskCount;
 import software.amazon.awscdk.services.ecs.Secret;
+import software.amazon.awscdk.services.ecs.patterns.ScheduledFargateTask;
+import software.amazon.awscdk.services.ecs.patterns.ScheduledFargateTaskDefinitionOptions;
+import software.amazon.awscdk.services.ecs.patterns.ScheduledFargateTaskImageOptions;
+import software.amazon.awscdk.services.ecs.patterns.ScheduledFargateTaskProps;
 import software.amazon.awscdk.services.elasticloadbalancingv2.AddApplicationActionProps;
 import software.amazon.awscdk.services.elasticloadbalancingv2.AddApplicationTargetsProps;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationListener;
@@ -62,6 +69,7 @@ import software.amazon.awscdk.services.iam.PolicyStatementProps;
 import software.amazon.awscdk.services.logs.LogGroup;
 import software.amazon.awscdk.services.logs.LogGroupProps;
 import software.amazon.awscdk.services.logs.RetentionDays;
+import software.amazon.awscdk.services.rds.DatabaseInstance;
 import software.amazon.awscdk.services.secretsmanager.ISecret;
 import software.amazon.awscdk.services.sns.Subscription;
 import software.amazon.awscdk.services.sns.SubscriptionProps;
@@ -78,13 +86,14 @@ public class ReCiterCDKECSStack extends NestedStack {
     private FargateService reCiterService;
     private FargateService reCiterScopusService;
     private FargateService reCiterPubManagerService;
+    private ScheduledFargateTask reCiterMachineLearningFargateTask;
     
     
     public ReCiterCDKECSStack(final Construct parent, final String id) {
-        this(parent, id, null, null, null, null, null, null, null, null, null);
+        this(parent, id, null, null, null, null, null, null, null, null, null, null, null);
     }
 
-    public ReCiterCDKECSStack(final Construct parent, final String id, final NestedStackProps props, IVpc vpc, ISecret reCiterSecret, ISecret reciterPubmedSecret, ISecret reciterScopusSecret, Repository reCiterEcrRepo, Repository reCiterPubmedEcrRep, Repository reCiterScopusEcrRepo, Repository reCiterPubManagerEcrRepo) {
+    public ReCiterCDKECSStack(final Construct parent, final String id, final NestedStackProps props, IVpc vpc, ISecret reCiterSecret, ISecret reciterPubmedSecret, ISecret reciterScopusSecret, Repository reCiterEcrRepo, Repository reCiterPubmedEcrRep, Repository reCiterScopusEcrRepo, Repository reCiterPubManagerEcrRepo, Repository reCiterMachineLearningAnalysisRepo, DatabaseInstance reciterDb) {
         super(parent, id, props);
 
         final SecurityGroup albSg = new SecurityGroup(this, "reciter-cdk-alb-sg", SecurityGroupProps.builder().allowAllOutbound(true)
@@ -103,7 +112,7 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .subnetType(SubnetType.PUBLIC)
                 .build()) 
             .deletionProtection(false)
-            .idleTimeout(Duration.seconds(60))
+            .idleTimeout(Duration.seconds(300))
             .http2Enabled(true)
             .internetFacing(true)
             .ipAddressType(IpAddressType.IPV4)
@@ -766,7 +775,81 @@ public class ReCiterCDKECSStack extends NestedStack {
             .build());
         
         reciterPubManagerHighMemoryUtilAlarm.addAlarmAction(new SnsAction(reciterAlarmTopic));
+
+        //ReCiter-Machine-Learning-Analysis cron job
+        reCiterMachineLearningFargateTask = new ScheduledFargateTask(this, "reCiterMachineLearningFargateTask", ScheduledFargateTaskProps.builder()
+            .cluster(reCiterCluster)
+            .desiredTaskCount(1)
+            .schedule(Schedule.cron(CronOptions.builder()
+                .hour("3")
+                .minute("00")
+                .build()))
+            .enabled(true)
+            .platformVersion(FargatePlatformVersion.LATEST)
+            .ruleName("reCiter-machine-learning-analysis-rule")
+            .vpc(vpc)
+            .subnetSelection(SubnetSelection.builder()
+                .onePerAz(true)
+                .subnetType(SubnetType.PRIVATE)
+                .build())
+            .securityGroups(Arrays.asList(reciterClusterSg))
+            .scheduledFargateTaskDefinitionOptions(ScheduledFargateTaskDefinitionOptions.builder()
+                .taskDefinition(new FargateTaskDefinition(this, "reCiterMachineLearningAnalysisTaskDef", FargateTaskDefinitionProps.builder()
+                    .cpu(1024)
+                    .memoryLimitMiB(8192)
+                    .build()))
+                .build())
+            .build());
+        String accountNumber = ReCiterCDKECSStack.of(this).getAccount();
+        String region = ReCiterCDKECSStack.of(this).getRegion();
+        reCiterMachineLearningFargateTask.getTaskDefinition().addContainer("reciter-machine-learning-analysis", ContainerDefinitionOptions.builder()
+            .cpu(1024)
+            .memoryLimitMiB(8000)
+            .image(ContainerImage.fromRegistry("wcmcits/reciter-machine-learning-analysis:latest"))
+            .containerName("reciter-machine-learning-analysis")
+            .healthCheck(HealthCheck.builder()
+                    .command(Arrays.asList("CMD-SHELL", "cat /usr/src/app/Dynamodb_Analysis_upload.py || exit 1"))
+                    .interval(Duration.minutes(1))
+                    .retries(2)
+                    .startPeriod(Duration.seconds(60))
+                    .timeout(Duration.seconds(30))
+                    .build())
+            .logging(new AwsLogDriver(AwsLogDriverProps.builder()
+                .logGroup(new LogGroup(this, "reciterMachineLearningAnalysisLogGroup", LogGroupProps.builder()
+                    .logGroupName("/ecs/reciter/machine/learning/analysis")
+                    .removalPolicy(RemovalPolicy.DESTROY)
+                    .retention(RetentionDays.ONE_MONTH)
+                    .build()))
+                .streamPrefix("machine-learning-logs")
+                .build()))
+            .environment(new HashMap<String, String>(){{
+                put("DB_USERNAME", "admin");
+                put("DB_HOST", reciterDb.getDbInstanceEndpointAddress());
+                put("DB_NAME", "reciter");
+                put("S3_BUCKET_NAME", "reciter-dynamodb-" + region + "-" + accountNumber);
+            }})
+            .secrets(new HashMap<String, Secret>(){{
+                put("DB_PASSWORD", Secret.fromSecretsManager(reciterDb.getSecret(), "password"));
+                put("AWS_DEFAULT_REGION", Secret.fromSecretsManager(reCiterSecret, "AWS_REGION"));
+            }})
+        .build());
         
+        reCiterMachineLearningFargateTask.getTaskDefinition().addToTaskRolePolicy(new PolicyStatement(PolicyStatementProps.builder()
+            .actions(Arrays.asList("dynamodb:BatchGetItem",
+                "dynamodb:GetItem",
+                "dynamodb:Query",
+                "dynamodb:Scan",
+                "dynamodb:ListTables",
+                "s3:GetObject",
+                "s3:ListBucket"))
+            .effect(Effect.ALLOW)
+            .resources(Arrays.asList("*"))
+            .sid("DynamoDbS3ReadAccess")
+            .build()));
+
+        reCiterMachineLearningAnalysisRepo.grantPull(reCiterMachineLearningFargateTask.getTaskDefinition().obtainExecutionRole());
+        //reciterDb.getConnections().allowFrom(reciterClusterSg, Port.tcp(3306), "Allow connections to database from Scheduled Task");
+
         //Tagging for all Resources
         Tags.of(this).add("application", "reciter");
         Tags.of(this).add("stack-id", ReCiterCDKECSStack.of(this).getStackId());
