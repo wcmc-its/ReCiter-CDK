@@ -88,6 +88,11 @@
         </dependency>
         <dependency>
             <groupId>software.amazon.awscdk</groupId>
+            <artifactId>ecs-patterns</artifactId>
+            <version>${cdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awscdk</groupId>
             <artifactId>cloudwatch</artifactId>
             <version>${cdk.version}</version>
         </dependency>
