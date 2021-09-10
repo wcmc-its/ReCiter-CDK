@@ -106,13 +106,14 @@ Use `export <environment variable name>=<value>`
 
 - We are all set to do the installation
     - Go to your terminal where you have cloned this repository. If not cloned then use `git clone https://github.com/wcmc-its/ReCiter-CDK.git`
-    - Run `cdk synth` and this will synthesize all the cloudformation template for you in `cdk.out` folder. If also if you have not environment variables properly it will prompt you.
-    - Run `cdk bootstrap` to create a s3 bucket to house the templates.
-    - Run `cdk deploy --profile reciter` reciter is thr profile name you gave when you set up the aws-cli with `aws configure --profile reciter`
+    - Run `cdk synth --profile <profile-name>` and this will synthesize all the cloudformation template for you in `cdk.out` folder. If also if you have not environment variables properly it will prompt you.
+    - Run `cdk bootstrap --profile <profile-name>` to create a s3 bucket to house the templates where `<profile-name>` is the profile name you gave when you set up the aws-cli with `aws configure --profile reciter`
+    - Run `cdk deploy --profile reciter` reciter is the profile name you gave when you set up the aws-cli with `aws configure --profile reciter`
     - This should take some time and you can login to AWS and go to Cloudformation service to see the progress. After it is installed you can go search for ECS and click on Stack and go to Output section to see the url for ReCiter and its components. 
     ![output user](/files/CloudFormation.png)
     - Remember all the resources here will be publicly accessible over the internet. Although we have Web appllication firewall providing necessary security against malicious bots and others. It is advisable to use it using SSL and valid certificate.
     - You will receive the email you entered for `ALARM_EMAIL` click on that to confirm the subscription. You will also receive emails when pipeline runs to get approval. You have to approve all the pipeline by clicking the links you get in the email.
+    - The ReCiter-Publication-Manager will not work untill and unless you manually approve the pipeline. To do so go to AWS console and then to CodePipeline then click on `ReCiter-Publication-Manager`. The Pipeline should be at Approve stage click on Review and hit Accept. You will also receive email with the email you have entered for `ALARM_EMAIL`.
 ### Enjoy ReCiter - For any questions email Sarbajit Dutta(szd2013@med.cornell.edu)
 
 ## Useful commands
