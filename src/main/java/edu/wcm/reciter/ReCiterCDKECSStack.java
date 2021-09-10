@@ -2,7 +2,10 @@ package edu.wcm.reciter;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.stream.Collectors;
 
+import software.amazon.awscdk.core.CfnJson;
+import software.amazon.awscdk.core.CfnJsonProps;
 import software.amazon.awscdk.core.CfnOutput;
 import software.amazon.awscdk.core.Construct;
 import software.amazon.awscdk.core.Duration;
@@ -17,6 +20,7 @@ import software.amazon.awscdk.services.cloudwatch.Alarm;
 import software.amazon.awscdk.services.cloudwatch.AlarmProps;
 import software.amazon.awscdk.services.cloudwatch.TreatMissingData;
 import software.amazon.awscdk.services.cloudwatch.actions.SnsAction;
+import software.amazon.awscdk.services.ec2.ISubnet;
 import software.amazon.awscdk.services.ec2.IVpc;
 import software.amazon.awscdk.services.ec2.Peer;
 import software.amazon.awscdk.services.ec2.Port;
@@ -48,7 +52,6 @@ import software.amazon.awscdk.services.ecs.ScalableTaskCount;
 import software.amazon.awscdk.services.ecs.Secret;
 import software.amazon.awscdk.services.ecs.patterns.ScheduledFargateTask;
 import software.amazon.awscdk.services.ecs.patterns.ScheduledFargateTaskDefinitionOptions;
-import software.amazon.awscdk.services.ecs.patterns.ScheduledFargateTaskImageOptions;
 import software.amazon.awscdk.services.ecs.patterns.ScheduledFargateTaskProps;
 import software.amazon.awscdk.services.elasticloadbalancingv2.AddApplicationActionProps;
 import software.amazon.awscdk.services.elasticloadbalancingv2.AddApplicationTargetsProps;
@@ -63,9 +66,15 @@ import software.amazon.awscdk.services.elasticloadbalancingv2.IpAddressType;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ListenerAction;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ListenerCondition;
 import software.amazon.awscdk.services.elasticloadbalancingv2.RedirectOptions;
+import software.amazon.awscdk.services.events.CfnRule;
 import software.amazon.awscdk.services.iam.Effect;
+import software.amazon.awscdk.services.iam.ManagedPolicy;
+import software.amazon.awscdk.services.iam.ManagedPolicyProps;
 import software.amazon.awscdk.services.iam.PolicyStatement;
 import software.amazon.awscdk.services.iam.PolicyStatementProps;
+import software.amazon.awscdk.services.iam.Role;
+import software.amazon.awscdk.services.iam.RoleProps;
+import software.amazon.awscdk.services.iam.ServicePrincipal;
 import software.amazon.awscdk.services.logs.LogGroup;
 import software.amazon.awscdk.services.logs.LogGroupProps;
 import software.amazon.awscdk.services.logs.RetentionDays;
@@ -800,6 +809,62 @@ public class ReCiterCDKECSStack extends NestedStack {
                     .build()))
                 .build())
             .build());
+
+        final Role reCiterMachineLearningEventsModifiedRule = new Role(this, "reCiterMachineLearningEventsModifiedRule", RoleProps.builder()
+            .description("This role will be events role for ReCiter-Machine-Learning-Analysis.")
+            .roleName("cdk-reciter-machine-learning-events-role")
+            .managedPolicies(Arrays.asList(new ManagedPolicy(this, "reCiterMachineLearningEventsPolicy", ManagedPolicyProps.builder()
+            .managedPolicyName("cdk-reciter-machine-learning-events-role-policy")
+            .description("This policy allows to run ECS task in cluster.")
+            .statements(Arrays.asList(new PolicyStatement(PolicyStatementProps.builder()
+                .sid("ecsRunTask")
+                .actions(Arrays.asList("ecs:RunTask"))
+                .effect(Effect.ALLOW)
+                .resources(Arrays.asList(reCiterMachineLearningFargateTask.getTaskDefinition().getTaskDefinitionArn()))
+                .conditions(new HashMap<String, Object>(){{
+                    put("ArnEquals", new HashMap<String, Object>(){{
+                        put("ecs:cluster", reCiterCluster.getClusterArn());
+                    }});
+                }})
+                .build()),
+            new PolicyStatement(PolicyStatementProps.builder()
+                .sid("iamPassRole")
+                .actions(Arrays.asList("iam:PassRole"))
+                .effect(Effect.ALLOW)
+                .resources(Arrays.asList(reCiterMachineLearningFargateTask.getTaskDefinition().obtainExecutionRole().getRoleArn(), reCiterMachineLearningFargateTask.getTaskDefinition().getTaskRole().getRoleArn()))
+                .build())))
+            .build())))
+            .assumedBy(new ServicePrincipal("events.amazonaws.com"))
+            .build());
+
+        CfnRule eventsRule = (CfnRule)reCiterMachineLearningFargateTask.getEventRule().getNode().getDefaultChild();
+        eventsRule.setTargets(Arrays.asList(
+            new CfnJson(this, "ecsTarget", CfnJsonProps.builder()
+                    .value(new HashMap<String, Object>(){{
+                        put("Arn", reCiterCluster.getClusterArn());
+                        put("Id", "Target0");
+                        put("RoleArn", reCiterMachineLearningEventsModifiedRule.getRoleArn());
+                        put("EcsParameters", new HashMap<String, Object>(){{
+                            put("LaunchType", "FARGATE");
+                            put("NetworkConfiguration", new HashMap<String, Object>(){{
+                                put("AwsVpcConfiguration", new HashMap<String, Object>(){{
+                                    put("AssignPublicIp", "DISABLED");
+                                    put("SecurityGroups", Arrays.asList(reciterClusterSg.getSecurityGroupId()));
+                                    put("Subnets", 
+                                    //Fn.split(",", Fn.importValue("vpcPrivateSubnets"))
+                                    vpc.getPrivateSubnets().stream().map(ISubnet::getSubnetId).collect(Collectors.toList())
+                                    );
+                                }});
+                            }});
+                            put("PlatformVersion", "LATEST");
+                            put("TaskCount", 1);
+                            put("TaskDefinitionArn", reCiterMachineLearningFargateTask.getTaskDefinition().getTaskDefinitionArn());
+                        }});
+                    }})
+                    .build()
+                ))
+            );
+    
         String accountNumber = ReCiterCDKECSStack.of(this).getAccount();
         String region = ReCiterCDKECSStack.of(this).getRegion();
         reCiterMachineLearningFargateTask.getTaskDefinition().addContainer("reciter-machine-learning-analysis", ContainerDefinitionOptions.builder()
