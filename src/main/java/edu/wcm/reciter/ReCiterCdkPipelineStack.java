@@ -44,6 +44,7 @@ import software.amazon.awscdk.services.ecs.FargateService;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationLoadBalancer;
 import software.amazon.awscdk.services.iam.PolicyStatement;
 import software.amazon.awscdk.services.secretsmanager.ISecret;
+import software.amazon.awscdk.services.secretsmanager.Secret;
 import software.amazon.awscdk.services.sns.Topic;
 
 public class ReCiterCdkPipelineStack extends NestedStack {
@@ -287,6 +288,7 @@ public class ReCiterCdkPipelineStack extends NestedStack {
                 .reportBuildStatus(false)
                 .build()))
             .badge(true)
+            .checkSecretsInPlainTextEnvVariables(false)
             .cache(Cache.local(LocalCacheMode.DOCKER_LAYER))
             .vpc(vpc)
                 .subnetSelection(SubnetSelection.builder()
@@ -308,8 +310,8 @@ public class ReCiterCdkPipelineStack extends NestedStack {
                     .value(reCiterCluster.getClusterName())
                     .build());
                 put("ADMIN_API_KEY", BuildEnvironmentVariable.builder()
-                    .type(BuildEnvironmentVariableType.SECRETS_MANAGER)
-                    .value(reCiterSecret.getSecretArn() + ":ADMIN_API_KEY")
+                    .type(BuildEnvironmentVariableType.PLAINTEXT)
+                    .value(Secret.fromSecretNameV2(ReCiterCdkPipelineStack.of(reCiterSecret), "adminApiKey", reCiterSecret.getSecretName()).secretValueFromJson("ADMIN_API_KEY").toString())
                     .build());
                 put("RECITER_ALB_URL", BuildEnvironmentVariable.builder()
                     .type(BuildEnvironmentVariableType.PLAINTEXT)
@@ -322,6 +324,11 @@ public class ReCiterCdkPipelineStack extends NestedStack {
             }})
             .buildSpec(BuildSpec.fromObjectToYaml(new HashMap<String, Object>(){{
                 put("version", "0.2");
+                /*put("env", new HashMap<String, Object>(){{
+                    put("secrets-manager", new HashMap<String, Object>(){{
+                        put("SECRET_KEY", reCiterSecret.getSecretArn() + ":ADMIN_API_KEY");
+                    }});
+                }});*/
                 put("phases", new JSONObject()
                     .put("pre_build", new JSONObject()
                         .put("commands", new JSONArray()
