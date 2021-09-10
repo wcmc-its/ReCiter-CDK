@@ -1,8 +1,7 @@
 package edu.wcm.reciter;
 
 import java.util.Arrays;
-
-import org.json.JSONObject;
+import java.util.HashMap;
 
 import software.amazon.awscdk.core.CfnOutput;
 import software.amazon.awscdk.core.Construct;
@@ -49,7 +48,7 @@ public class ReCiterCdkWAFStack extends NestedStack {
                 RuleProperty.builder()
                     .name("AWSManagedRulesCommonRuleSet")
                     .priority(0)
-                    .overrideAction(OverrideActionProperty.builder().none(new JSONObject()).build())
+                    .overrideAction(OverrideActionProperty.builder().none(new HashMap<String, Object>()).build())
                     .visibilityConfig(VisibilityConfigProperty.builder()
                         .cloudWatchMetricsEnabled(true)
                         .sampledRequestsEnabled(true)
@@ -66,7 +65,7 @@ public class ReCiterCdkWAFStack extends NestedStack {
                 RuleProperty.builder()
                     .name("AWSManagedRulesLinuxRuleSet")
                     .priority(1)
-                    .overrideAction(OverrideActionProperty.builder().none(new JSONObject()).build())
+                    .overrideAction(OverrideActionProperty.builder().none(new HashMap<String, Object>()).build())
                     .visibilityConfig(VisibilityConfigProperty.builder()
                         .cloudWatchMetricsEnabled(true)
                         .sampledRequestsEnabled(true)
@@ -83,7 +82,7 @@ public class ReCiterCdkWAFStack extends NestedStack {
                 RuleProperty.builder()
                     .name("AWSManagedRulesSQLiRuleSet")
                     .priority(2)
-                    .overrideAction(OverrideActionProperty.builder().none(new JSONObject()).build())
+                    .overrideAction(OverrideActionProperty.builder().none(new HashMap<String, Object>()).build())
                     .visibilityConfig(VisibilityConfigProperty.builder()
                         .cloudWatchMetricsEnabled(true)
                         .sampledRequestsEnabled(true)
@@ -100,7 +99,7 @@ public class ReCiterCdkWAFStack extends NestedStack {
                     RuleProperty.builder()
                         .name("AWSManagedRulesKnownBadInputsRuleSet")
                         .priority(3)
-                        .overrideAction(OverrideActionProperty.builder().none(new JSONObject()).build())
+                        .overrideAction(OverrideActionProperty.builder().none(new HashMap<String, Object>()).build())
                         .visibilityConfig(VisibilityConfigProperty.builder()
                             .cloudWatchMetricsEnabled(true)
                             .sampledRequestsEnabled(true)
