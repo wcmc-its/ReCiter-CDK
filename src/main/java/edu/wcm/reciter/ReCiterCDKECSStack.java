@@ -454,7 +454,7 @@ public class ReCiterCDKECSStack extends NestedStack {
 
         
         ContainerDefinition reCiterPubManagerContainer = reCiterPubManagerTaskDefinition.addContainer("reCiterScopusContainer", ContainerDefinitionProps.builder()
-            .image(ContainerImage.fromRegistry("httpd:latest"))
+            .image(ContainerImage.fromRegistry("wcmcits/reciter-publication-manager:latest"))
             .logging(new AwsLogDriver(AwsLogDriverProps.builder()
                 .logGroup(new LogGroup(this, "reciterPubManagerLogGroup", LogGroupProps.builder()
                     .logGroupName("/ecs/reciter/pub/manager")
