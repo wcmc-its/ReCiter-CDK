@@ -2,6 +2,7 @@ package edu.wcm.reciter;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.stream.Collectors;
 
 import software.amazon.awscdk.core.Aspects;
 import software.amazon.awscdk.core.CfnOutput;
@@ -14,6 +15,7 @@ import software.amazon.awscdk.core.Tags;
 import software.amazon.awscdk.services.ec2.FlowLogDestination;
 import software.amazon.awscdk.services.ec2.FlowLogOptions;
 import software.amazon.awscdk.services.ec2.FlowLogTrafficType;
+import software.amazon.awscdk.services.ec2.ISubnet;
 import software.amazon.awscdk.services.ec2.IVpc;
 import software.amazon.awscdk.services.ec2.NatProvider;
 import software.amazon.awscdk.services.ec2.SubnetConfiguration;
@@ -98,13 +100,13 @@ public class ReCiterCDKVPCStack extends NestedStack {
         CfnOutput.Builder.create(this, "vpcPrivateSubnets")
             .description("VPC Private Subnets for ReCiter")
             .exportName("vpcPrivateSubnets")
-            .value(reciterVpc.getPrivateSubnets().toString())
+            .value(reciterVpc.getPrivateSubnets().stream().map(ISubnet::getSubnetId).collect(Collectors.toList()).toString())
             .build();
 
         CfnOutput.Builder.create(this, "vpcPublicSubnets")
             .description("VPC Public Subnets for ReCiter")
             .exportName("vpcPublicSubnets")
-            .value(reciterVpc.getPublicSubnets().toString())
+            .value(reciterVpc.getPublicSubnets().stream().map(ISubnet::getSubnetId).collect(Collectors.toList()).toString())
             .build();
 
         CfnOutput.Builder.create(this, "vpcPublicSubnetGroup")
