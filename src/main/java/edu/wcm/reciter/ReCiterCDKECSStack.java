@@ -465,7 +465,7 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .build()))
             .containerName("reciter-pub-manager")
             .healthCheck(HealthCheck.builder()
-                .command(Arrays.asList("CMD-SHELL", "curl -f http://localhost:8081/login || exit 1"))
+                .command(Arrays.asList("CMD-SHELL", "wget --spider -S http://localhost:8081/login || exit 1"))
                 .interval(Duration.minutes(5))
                 .retries(2)
                 .startPeriod(Duration.seconds(60))
