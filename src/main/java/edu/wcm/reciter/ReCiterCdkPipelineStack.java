@@ -315,7 +315,7 @@ public class ReCiterCdkPipelineStack extends NestedStack {
                     .build());
                 put("RECITER_ALB_URL", BuildEnvironmentVariable.builder()
                     .type(BuildEnvironmentVariableType.PLAINTEXT)
-                    .value(reCiterAlb.getLoadBalancerDnsName())
+                    .value("http://" + reCiterAlb.getLoadBalancerDnsName())
                     .build());
                 put("TOKEN_SECRET", BuildEnvironmentVariable.builder()
                     .type(BuildEnvironmentVariableType.PLAINTEXT)
