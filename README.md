@@ -1,4 +1,3 @@
-## Purpose
 
 # ReCiter-CDK Java project
 
