@@ -3,11 +3,11 @@ package edu.wcm.reciter;
 import java.util.Arrays;
 import java.util.HashMap;
 
-import software.amazon.awscdk.core.CfnOutput;
-import software.amazon.awscdk.core.Construct;
-import software.amazon.awscdk.core.NestedStack;
-import software.amazon.awscdk.core.NestedStackProps;
-import software.amazon.awscdk.core.Tags;
+import software.amazon.awscdk.CfnOutput;
+import software.constructs.Construct;
+import software.amazon.awscdk.NestedStack;
+import software.amazon.awscdk.NestedStackProps;
+import software.amazon.awscdk.Tags;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationLoadBalancer;
 import software.amazon.awscdk.services.wafv2.CfnWebACL;
 import software.amazon.awscdk.services.wafv2.CfnWebACL.AllowActionProperty;

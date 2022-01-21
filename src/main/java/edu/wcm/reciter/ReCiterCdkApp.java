@@ -2,9 +2,9 @@ package edu.wcm.reciter;
 
 import java.util.HashMap;
 
-import software.amazon.awscdk.core.App;
-import software.amazon.awscdk.core.Environment;
-import software.amazon.awscdk.core.StackProps;
+import software.amazon.awscdk.App;
+import software.amazon.awscdk.Environment;
+import software.amazon.awscdk.StackProps;
 
 public class ReCiterCdkApp {
 
@@ -20,7 +20,7 @@ public class ReCiterCdkApp {
     }
     public static void main(final String[] args) {
         App app = new App();
-        Environment envReCiter = makeEnv(null, null);
+        Environment envReCiter = makeEnv(null, "us-east-2");
         if((System.getenv("ADMIN_API_KEY") == null || System.getenv("ADMIN_API_KEY").isEmpty())
         ||
         (System.getenv("CONSUMER_API_KEY") == null || System.getenv("CONSUMER_API_KEY").isEmpty())

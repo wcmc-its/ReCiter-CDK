@@ -4,15 +4,15 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.stream.Collectors;
 
-import software.amazon.awscdk.core.CfnJson;
-import software.amazon.awscdk.core.CfnJsonProps;
-import software.amazon.awscdk.core.CfnOutput;
-import software.amazon.awscdk.core.Construct;
-import software.amazon.awscdk.core.Duration;
-import software.amazon.awscdk.core.NestedStack;
-import software.amazon.awscdk.core.NestedStackProps;
-import software.amazon.awscdk.core.RemovalPolicy;
-import software.amazon.awscdk.core.Tags;
+import software.amazon.awscdk.CfnJson;
+import software.amazon.awscdk.CfnJsonProps;
+import software.amazon.awscdk.CfnOutput;
+import software.constructs.Construct;
+import software.amazon.awscdk.Duration;
+import software.amazon.awscdk.NestedStack;
+import software.amazon.awscdk.NestedStackProps;
+import software.amazon.awscdk.RemovalPolicy;
+import software.amazon.awscdk.Tags;
 import software.amazon.awscdk.services.applicationautoscaling.CronOptions;
 import software.amazon.awscdk.services.applicationautoscaling.EnableScalingProps;
 import software.amazon.awscdk.services.applicationautoscaling.Schedule;
@@ -257,7 +257,7 @@ public class ReCiterCDKECSStack extends NestedStack {
             .propagateTags(PropagatedTagSource.SERVICE)
             .vpcSubnets(SubnetSelection.builder()
                 .onePerAz(true)
-                .subnetType(SubnetType.PRIVATE)
+                .subnetType(SubnetType.PRIVATE_WITH_NAT)
                 .build())
             .securityGroups(Arrays.asList(reciterClusterSg))
             .build());
@@ -345,7 +345,7 @@ public class ReCiterCDKECSStack extends NestedStack {
             .propagateTags(PropagatedTagSource.SERVICE)
             .vpcSubnets(SubnetSelection.builder()
                 .onePerAz(true)
-                .subnetType(SubnetType.PRIVATE)
+                .subnetType(SubnetType.PRIVATE_WITH_NAT)
                 .build())
             .securityGroups(Arrays.asList(reciterClusterSg))
             .build());
@@ -437,7 +437,7 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .propagateTags(PropagatedTagSource.SERVICE)
                 .vpcSubnets(SubnetSelection.builder()
                     .onePerAz(true)
-                    .subnetType(SubnetType.PRIVATE)
+                    .subnetType(SubnetType.PRIVATE_WITH_NAT)
                     .build())
                 .securityGroups(Arrays.asList(reciterClusterSg))
                 .build());
@@ -495,7 +495,7 @@ public class ReCiterCDKECSStack extends NestedStack {
             .propagateTags(PropagatedTagSource.SERVICE)
             .vpcSubnets(SubnetSelection.builder()
                 .onePerAz(true)
-                .subnetType(SubnetType.PRIVATE)
+                .subnetType(SubnetType.PRIVATE_WITH_NAT)
                 .build())
             .securityGroups(Arrays.asList(albSg))
             .build());
@@ -799,7 +799,7 @@ public class ReCiterCDKECSStack extends NestedStack {
             .vpc(vpc)
             .subnetSelection(SubnetSelection.builder()
                 .onePerAz(true)
-                .subnetType(SubnetType.PRIVATE)
+                .subnetType(SubnetType.PRIVATE_WITH_NAT)
                 .build())
             .securityGroups(Arrays.asList(reciterClusterSg))
             .scheduledFargateTaskDefinitionOptions(ScheduledFargateTaskDefinitionOptions.builder()

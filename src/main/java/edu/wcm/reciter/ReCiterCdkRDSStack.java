@@ -2,13 +2,13 @@ package edu.wcm.reciter;
 
 import org.json.JSONObject;
 
-import software.amazon.awscdk.core.CfnOutput;
-import software.amazon.awscdk.core.Construct;
-import software.amazon.awscdk.core.Duration;
-import software.amazon.awscdk.core.NestedStack;
-import software.amazon.awscdk.core.NestedStackProps;
-import software.amazon.awscdk.core.RemovalPolicy;
-import software.amazon.awscdk.core.Tags;
+import software.amazon.awscdk.CfnOutput;
+import software.constructs.Construct;
+import software.amazon.awscdk.Duration;
+import software.amazon.awscdk.NestedStack;
+import software.amazon.awscdk.NestedStackProps;
+import software.amazon.awscdk.RemovalPolicy;
+import software.amazon.awscdk.Tags;
 import software.amazon.awscdk.services.ec2.IVpc;
 import software.amazon.awscdk.services.ec2.InstanceClass;
 import software.amazon.awscdk.services.ec2.InstanceSize;
@@ -39,7 +39,7 @@ public class ReCiterCdkRDSStack extends NestedStack {
 
         reciterDb = new DatabaseInstance(this, "reciterDb", DatabaseInstanceProps.builder()
             .engine(DatabaseInstanceEngine.mariaDb(MariaDbInstanceEngineProps.builder()
-                .version(MariaDbEngineVersion.VER_10_5_9)
+                .version(MariaDbEngineVersion.VER_10_5_13)
                 .build()))
             .vpc(vpc)
             .allocatedStorage(50)

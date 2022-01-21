@@ -4,14 +4,14 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.stream.Collectors;
 
-import software.amazon.awscdk.core.Aspects;
-import software.amazon.awscdk.core.CfnOutput;
-import software.amazon.awscdk.core.Construct;
-import software.amazon.awscdk.core.NestedStack;
-import software.amazon.awscdk.core.NestedStackProps;
-import software.amazon.awscdk.core.RemovalPolicy;
-import software.amazon.awscdk.core.Tag;
-import software.amazon.awscdk.core.Tags;
+import software.amazon.awscdk.Aspects;
+import software.amazon.awscdk.CfnOutput;
+import software.constructs.Construct;
+import software.amazon.awscdk.NestedStack;
+import software.amazon.awscdk.NestedStackProps;
+import software.amazon.awscdk.RemovalPolicy;
+import software.amazon.awscdk.Tag;
+import software.amazon.awscdk.Tags;
 import software.amazon.awscdk.services.ec2.FlowLogDestination;
 import software.amazon.awscdk.services.ec2.FlowLogOptions;
 import software.amazon.awscdk.services.ec2.FlowLogTrafficType;
@@ -48,8 +48,8 @@ public class ReCiterCDKVPCStack extends NestedStack {
             .natGateways(2)
             .maxAzs(2)
             .subnetConfiguration(Arrays.asList(SubnetConfiguration.builder().cidrMask(24).name("reciter-public-subnet").subnetType(SubnetType.PUBLIC).build(),
-                SubnetConfiguration.builder().cidrMask(24).name("reciter-private-app-subnet").subnetType(SubnetType.PRIVATE).build(),
-                SubnetConfiguration.builder().cidrMask(28).name("reciter-private-db-subnet").subnetType(SubnetType.PRIVATE).build()))
+                SubnetConfiguration.builder().cidrMask(24).name("reciter-private-app-subnet").subnetType(SubnetType.PRIVATE_WITH_NAT).build(),
+                SubnetConfiguration.builder().cidrMask(28).name("reciter-private-db-subnet").subnetType(SubnetType.PRIVATE_WITH_NAT).build()))
             .enableDnsHostnames(true)
             .flowLogs(new HashMap<String, FlowLogOptions>(){{
                 put("reciter-flow-logs", FlowLogOptions.builder()
@@ -71,7 +71,7 @@ public class ReCiterCDKVPCStack extends NestedStack {
             .removalPolicy(RemovalPolicy.DESTROY)
             .subnetGroupName("reciter-private-subnet-group")
             .vpc(reciterVpc)
-            .vpcSubnets(SubnetSelection.builder().subnetType(SubnetType.PRIVATE).build())
+            .vpcSubnets(SubnetSelection.builder().subnetType(SubnetType.PRIVATE_WITH_NAT).build())
             .build());
         
         
