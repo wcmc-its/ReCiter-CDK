@@ -6,10 +6,8 @@ import java.util.HashMap;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import software.constructs.Construct;
 import software.amazon.awscdk.NestedStack;
 import software.amazon.awscdk.NestedStackProps;
-import software.amazon.awscdk.RemovalPolicy;
 import software.amazon.awscdk.SecretValue;
 import software.amazon.awscdk.services.codebuild.BuildEnvironment;
 import software.amazon.awscdk.services.codebuild.BuildEnvironmentVariable;
@@ -47,6 +45,7 @@ import software.amazon.awscdk.services.iam.PolicyStatement;
 import software.amazon.awscdk.services.secretsmanager.ISecret;
 import software.amazon.awscdk.services.secretsmanager.Secret;
 import software.amazon.awscdk.services.sns.Topic;
+import software.constructs.Construct;
 
 public class ReCiterCdkPipelineStack extends NestedStack {
 
