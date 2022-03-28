@@ -1,9 +1,10 @@
 package edu.wcm.reciter;
 
+import java.util.HashMap;
+
 import org.json.JSONObject;
 
 import software.amazon.awscdk.CfnOutput;
-import software.constructs.Construct;
 import software.amazon.awscdk.Duration;
 import software.amazon.awscdk.NestedStack;
 import software.amazon.awscdk.NestedStackProps;
@@ -21,10 +22,12 @@ import software.amazon.awscdk.services.rds.DatabaseInstanceProps;
 import software.amazon.awscdk.services.rds.LicenseModel;
 import software.amazon.awscdk.services.rds.MariaDbEngineVersion;
 import software.amazon.awscdk.services.rds.MariaDbInstanceEngineProps;
+import software.amazon.awscdk.services.rds.ParameterGroup;
 import software.amazon.awscdk.services.rds.StorageType;
 import software.amazon.awscdk.services.rds.SubnetGroup;
 import software.amazon.awscdk.services.secretsmanager.Secret;
 import software.amazon.awscdk.services.secretsmanager.SecretStringGenerator;
+import software.constructs.Construct;
 
 public class ReCiterCdkRDSStack extends NestedStack {
 
@@ -58,6 +61,15 @@ public class ReCiterCdkRDSStack extends NestedStack {
             .port(3306)
             .removalPolicy(RemovalPolicy.DESTROY)
             .storageType(StorageType.GP2)
+            .parameterGroup(ParameterGroup.Builder.create(this, "reciterReportDbParameterGroup")
+                .engine(DatabaseInstanceEngine.mariaDb(MariaDbInstanceEngineProps.builder()
+                    .version(MariaDbEngineVersion.VER_10_5_13)
+                    .build()))
+                .description("This is the parameter group for reciter-report-db for MariaDB 10.5.13")
+                .parameters(new HashMap<String, String>(){{
+                    put("event_scheduler", "ON");
+                }})
+                .build())
             .subnetGroup(publicDbSubnetGroup)
             .preferredBackupWindow("01:00-02:00")
             .preferredMaintenanceWindow("Sat:03:00-Sat:05:00")
