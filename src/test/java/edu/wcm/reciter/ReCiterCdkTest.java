@@ -11,8 +11,8 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 
 import org.junit.jupiter.api.Test;
 
-import software.amazon.awscdk.core.App;
-import software.amazon.awscdk.core.StackProps;
+import software.amazon.awscdk.App;
+import software.amazon.awscdk.StackProps;
 
 public class ReCiterCdkTest {
     private final static ObjectMapper JSON =

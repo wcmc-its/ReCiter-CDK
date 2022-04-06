@@ -6,10 +6,9 @@ import java.util.HashMap;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import software.amazon.awscdk.core.Construct;
-import software.amazon.awscdk.core.NestedStack;
-import software.amazon.awscdk.core.NestedStackProps;
-import software.amazon.awscdk.core.SecretValue;
+import software.amazon.awscdk.NestedStack;
+import software.amazon.awscdk.NestedStackProps;
+import software.amazon.awscdk.SecretValue;
 import software.amazon.awscdk.services.codebuild.BuildEnvironment;
 import software.amazon.awscdk.services.codebuild.BuildEnvironmentVariable;
 import software.amazon.awscdk.services.codebuild.BuildEnvironmentVariableType;
@@ -46,6 +45,7 @@ import software.amazon.awscdk.services.iam.PolicyStatement;
 import software.amazon.awscdk.services.secretsmanager.ISecret;
 import software.amazon.awscdk.services.secretsmanager.Secret;
 import software.amazon.awscdk.services.sns.Topic;
+import software.constructs.Construct;
 
 public class ReCiterCdkPipelineStack extends NestedStack {
 
@@ -89,7 +89,7 @@ public class ReCiterCdkPipelineStack extends NestedStack {
             .vpc(vpc)
             .subnetSelection(SubnetSelection.builder()
                 .onePerAz(true)
-                .subnetType(SubnetType.PRIVATE)
+                .subnetType(SubnetType.PRIVATE_WITH_NAT)
                 .build())
             .environment(BuildEnvironment.builder()
                 .buildImage(LinuxBuildImage.AMAZON_LINUX_2_3)
@@ -162,7 +162,7 @@ public class ReCiterCdkPipelineStack extends NestedStack {
                 .vpc(vpc)
                 .subnetSelection(SubnetSelection.builder()
                     .onePerAz(true)
-                    .subnetType(SubnetType.PRIVATE)
+                    .subnetType(SubnetType.PRIVATE_WITH_NAT)
                     .build())
                 .environmentVariables(new HashMap<String, BuildEnvironmentVariable>(){{
                     put("ECR_REPO_URI", BuildEnvironmentVariable.builder()
@@ -225,7 +225,7 @@ public class ReCiterCdkPipelineStack extends NestedStack {
             .vpc(vpc)
                 .subnetSelection(SubnetSelection.builder()
                     .onePerAz(true)
-                    .subnetType(SubnetType.PRIVATE)
+                    .subnetType(SubnetType.PRIVATE_WITH_NAT)
                     .build())
             .environment(BuildEnvironment.builder()
                 .buildImage(LinuxBuildImage.AMAZON_LINUX_2_3)
@@ -293,7 +293,7 @@ public class ReCiterCdkPipelineStack extends NestedStack {
             .vpc(vpc)
                 .subnetSelection(SubnetSelection.builder()
                     .onePerAz(true)
-                    .subnetType(SubnetType.PRIVATE)
+                    .subnetType(SubnetType.PRIVATE_WITH_NAT)
                     .build())
             .environment(BuildEnvironment.builder()
                 .buildImage(LinuxBuildImage.AMAZON_LINUX_2_3)
@@ -380,7 +380,7 @@ public class ReCiterCdkPipelineStack extends NestedStack {
             .vpc(vpc)
                 .subnetSelection(SubnetSelection.builder()
                     .onePerAz(true)
-                    .subnetType(SubnetType.PRIVATE)
+                    .subnetType(SubnetType.PRIVATE_WITH_NAT)
                     .build())
             .environment(BuildEnvironment.builder()
                 .buildImage(LinuxBuildImage.AMAZON_LINUX_2_3)

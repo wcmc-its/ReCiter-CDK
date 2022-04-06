@@ -1,11 +1,11 @@
 package edu.wcm.reciter;
 
-import software.amazon.awscdk.core.Construct;
-import software.amazon.awscdk.core.NestedStack;
-import software.amazon.awscdk.core.NestedStackProps;
-import software.amazon.awscdk.core.RemovalPolicy;
-import software.amazon.awscdk.core.Stack;
-import software.amazon.awscdk.core.StackProps;
+import software.constructs.Construct;
+import software.amazon.awscdk.NestedStack;
+import software.amazon.awscdk.NestedStackProps;
+import software.amazon.awscdk.RemovalPolicy;
+import software.amazon.awscdk.Stack;
+import software.amazon.awscdk.StackProps;
 
 public class ReCiterCdkStack extends Stack {
     public ReCiterCdkStack(final Construct scope, final String id) {

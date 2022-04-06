@@ -2,10 +2,10 @@ package edu.wcm.reciter;
 
 import org.json.JSONObject;
 
-import software.amazon.awscdk.core.Construct;
-import software.amazon.awscdk.core.NestedStack;
-import software.amazon.awscdk.core.NestedStackProps;
-import software.amazon.awscdk.core.RemovalPolicy;
+import software.constructs.Construct;
+import software.amazon.awscdk.NestedStack;
+import software.amazon.awscdk.NestedStackProps;
+import software.amazon.awscdk.RemovalPolicy;
 import software.amazon.awscdk.services.secretsmanager.ISecret;
 import software.amazon.awscdk.services.secretsmanager.Secret;
 import software.amazon.awscdk.services.secretsmanager.SecretProps;

@@ -2,12 +2,12 @@ package edu.wcm.reciter;
 
 import java.util.Arrays;
 
-import software.amazon.awscdk.core.CfnOutput;
-import software.amazon.awscdk.core.Construct;
-import software.amazon.awscdk.core.NestedStack;
-import software.amazon.awscdk.core.NestedStackProps;
-import software.amazon.awscdk.core.RemovalPolicy;
-import software.amazon.awscdk.core.Tags;
+import software.amazon.awscdk.CfnOutput;
+import software.constructs.Construct;
+import software.amazon.awscdk.NestedStack;
+import software.amazon.awscdk.NestedStackProps;
+import software.amazon.awscdk.RemovalPolicy;
+import software.amazon.awscdk.Tags;
 import software.amazon.awscdk.services.ecr.Repository;
 import software.amazon.awscdk.services.ecr.RepositoryProps;
 import software.amazon.awscdk.services.ecr.LifecycleRule;
