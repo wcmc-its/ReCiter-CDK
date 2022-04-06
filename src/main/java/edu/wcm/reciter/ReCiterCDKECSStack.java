@@ -7,7 +7,6 @@ import java.util.stream.Collectors;
 import software.amazon.awscdk.CfnJson;
 import software.amazon.awscdk.CfnJsonProps;
 import software.amazon.awscdk.CfnOutput;
-import software.constructs.Construct;
 import software.amazon.awscdk.Duration;
 import software.amazon.awscdk.NestedStack;
 import software.amazon.awscdk.NestedStackProps;
@@ -85,6 +84,7 @@ import software.amazon.awscdk.services.sns.SubscriptionProps;
 import software.amazon.awscdk.services.sns.SubscriptionProtocol;
 import software.amazon.awscdk.services.sns.Topic;
 import software.amazon.awscdk.services.sns.TopicProps;
+import software.constructs.Construct;
 
 public class ReCiterCDKECSStack extends NestedStack {
 
@@ -163,7 +163,7 @@ public class ReCiterCDKECSStack extends NestedStack {
         reCiterEcrRepo.grantPull(reCiterTaskDefinition.obtainExecutionRole());
 
         ContainerDefinition reCiterNginxContainer = reCiterTaskDefinition.addContainer("reCiterNginxContainer", ContainerDefinitionProps.builder()
-            .image(ContainerImage.fromRegistry("wcmcits/reciter-nginx:latest"))
+            .image(ContainerImage.fromRegistry("public.ecr.aws/wcmc-its/reciter-nginx:latest"))
             .logging(new AwsLogDriver(AwsLogDriverProps.builder()
                 .logGroup(new LogGroup(this, "reciterNginxLogGroup", LogGroupProps.builder()
                     .logGroupName("/ecs/reciter/nginx")
@@ -188,7 +188,7 @@ public class ReCiterCDKECSStack extends NestedStack {
 
         
         ContainerDefinition reCiterContainer = reCiterTaskDefinition.addContainer("reCiterContainer", ContainerDefinitionProps.builder()
-            .image(ContainerImage.fromRegistry("wcmcits/reciter:latest"))
+            .image(ContainerImage.fromRegistry("public.ecr.aws/wcmc-its/reciter:latest"))
             .logging(new AwsLogDriver(AwsLogDriverProps.builder()
                 .logGroup(new LogGroup(this, "reciterLogGroup", LogGroupProps.builder()
                     .logGroupName("/ecs/reciter")
@@ -272,7 +272,7 @@ public class ReCiterCDKECSStack extends NestedStack {
         reCiterPubmedEcrRep.grantPull(reCiterPubmedTaskDefinition.obtainExecutionRole());
 
         ContainerDefinition reCiterPubmedNginxContainer = reCiterPubmedTaskDefinition.addContainer("reCiterPubmedNginxContainer", ContainerDefinitionProps.builder()
-            .image(ContainerImage.fromRegistry("wcmcits/reciter-pubmed-nginx:latest"))
+            .image(ContainerImage.fromRegistry("public.ecr.aws/wcmc-its/reciter-pubmed-retrieval-tool-nginx:latest"))
             .logging(new AwsLogDriver(AwsLogDriverProps.builder()
                     .logGroup(new LogGroup(this, "reciterNginxPubmedLogGroup", LogGroupProps.builder()
                         .logGroupName("/ecs/reciter/pubmed/nginx")
@@ -297,7 +297,7 @@ public class ReCiterCDKECSStack extends NestedStack {
 
         
         ContainerDefinition reCiterPubmedContainer = reCiterPubmedTaskDefinition.addContainer("reCiterPubmedContainer", ContainerDefinitionProps.builder()
-            .image(ContainerImage.fromRegistry("wcmcits/reciter-pubmed:latest"))
+            .image(ContainerImage.fromRegistry("public.ecr.aws/wcmc-its/reciter-pubmed-retrieval-tool:latest"))
             .logging(new AwsLogDriver(AwsLogDriverProps.builder()
                 .logGroup(new LogGroup(this, "reciterPubmedLogGroup", LogGroupProps.builder()
                     .logGroupName("/ecs/reciter/pubmed")
@@ -361,7 +361,7 @@ public class ReCiterCDKECSStack extends NestedStack {
             reCiterScopusEcrRepo.grantPull(reCiterScopusTaskDefinition.obtainExecutionRole());
             
             ContainerDefinition reCiterScopusNginxContainer = reCiterScopusTaskDefinition.addContainer("reCiterScopusNginxContainer", ContainerDefinitionProps.builder()
-                .image(ContainerImage.fromRegistry("wcmcits/reciter-scopus-nginx:latest"))
+                .image(ContainerImage.fromRegistry("public.ecr.aws/wcmc-its/reciter-scopus-retrieval-tool-nginx:latest"))
                 .logging(new AwsLogDriver(AwsLogDriverProps.builder()
                     .logGroup(new LogGroup(this, "reciterNginxScopusLogGroup", LogGroupProps.builder()
                         .logGroupName("/ecs/reciter/scopus/nginx")
@@ -385,7 +385,7 @@ public class ReCiterCDKECSStack extends NestedStack {
                 .build());
             
             ContainerDefinition reCiterScopusContainer = reCiterScopusTaskDefinition.addContainer("reCiterScopusContainer", ContainerDefinitionProps.builder()
-                .image(ContainerImage.fromRegistry("wcmcits/reciter-scopus:latest"))
+                .image(ContainerImage.fromRegistry("public.ecr.aws/wcmc-its/reciter-scopus-retrieval-tool:latest"))
                 .logging(new AwsLogDriver(AwsLogDriverProps.builder()
                     .logGroup(new LogGroup(this, "reciterScopusLogGroup", LogGroupProps.builder()
                         .logGroupName("/ecs/reciter/scopus")
@@ -454,7 +454,7 @@ public class ReCiterCDKECSStack extends NestedStack {
 
         
         ContainerDefinition reCiterPubManagerContainer = reCiterPubManagerTaskDefinition.addContainer("reCiterScopusContainer", ContainerDefinitionProps.builder()
-            .image(ContainerImage.fromRegistry("wcmcits/reciter-publication-manager:latest"))
+            .image(ContainerImage.fromRegistry("public.ecr.aws/wcmc-its/reciter-publication-manager:latest"))
             .logging(new AwsLogDriver(AwsLogDriverProps.builder()
                 .logGroup(new LogGroup(this, "reciterPubManagerLogGroup", LogGroupProps.builder()
                     .logGroupName("/ecs/reciter/pub/manager")
@@ -870,7 +870,7 @@ public class ReCiterCDKECSStack extends NestedStack {
         reCiterMachineLearningFargateTask.getTaskDefinition().addContainer("reciter-machine-learning-analysis", ContainerDefinitionOptions.builder()
             .cpu(1024)
             .memoryLimitMiB(8000)
-            .image(ContainerImage.fromRegistry("wcmcits/reciter-machine-learning-analysis:latest"))
+            .image(ContainerImage.fromRegistry("public.ecr.aws/wcmc-its/reciter-machine-learning-analysis:latest"))
             .containerName("reciter-machine-learning-analysis")
             .healthCheck(HealthCheck.builder()
                     .command(Arrays.asList("CMD-SHELL", "cat /usr/src/app/Dynamodb_Analysis_upload.py || exit 1"))
