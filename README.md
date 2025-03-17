@@ -196,4 +196,4 @@ A: See the final step. You must re-run the pipeline for ReCiter-Publication-Mana
 
 ## Follow up
 
-For any questions email [Sarbajit Dutta](szd2013@med.cornell.edu)
+For any questions email [Paul Albert](paa2013@med.cornell.edu)
