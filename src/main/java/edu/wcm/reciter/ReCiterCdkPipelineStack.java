@@ -2,6 +2,8 @@ package edu.wcm.reciter;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -41,7 +43,9 @@ import software.amazon.awscdk.services.ecr.Repository;
 import software.amazon.awscdk.services.ecs.Cluster;
 import software.amazon.awscdk.services.ecs.FargateService;
 import software.amazon.awscdk.services.elasticloadbalancingv2.ApplicationLoadBalancer;
+import software.amazon.awscdk.services.iam.IRole;
 import software.amazon.awscdk.services.iam.PolicyStatement;
+import software.amazon.awscdk.services.lambda.IFunction;
 import software.amazon.awscdk.services.secretsmanager.ISecret;
 import software.amazon.awscdk.services.secretsmanager.Secret;
 import software.amazon.awscdk.services.sns.Topic;
@@ -54,6 +58,8 @@ public class ReCiterCdkPipelineStack extends NestedStack {
     private final Project reCiterCodebuildProject;
     private final Project reCiterPubManagerCodebuildProject;
     private final Project reCiterMachineLearningAnalysisProject;
+    private final Project reCiterPubNotifierCodeBuildProject;
+    private final Project reCiterScoringCodeBuildProject;
     private Artifact sourceOutput = new Artifact();
     private Artifact buildOutput = new Artifact();
     private Artifact reCiterScopusSourceOutput = new Artifact();
@@ -64,14 +70,19 @@ public class ReCiterCdkPipelineStack extends NestedStack {
     private Artifact reCiterPubManagerbuildOutput = new Artifact();
     private Artifact reCiterMachineLearningAnalysisSourceOutput = new Artifact();
     private Artifact reCiterMachineLearningAnalysisbuildOutput = new Artifact();
+    private Artifact reCiterPubNofifierSourceOutput = new Artifact();
+    private Artifact reCiterPubNotifierbuildOutput = new Artifact();
+    private Artifact reCiterScoringSourceOutput = new Artifact();
+    private Artifact reCiterScoringbuildOutput = new Artifact();
+    
     
     public ReCiterCdkPipelineStack(final Construct parent, final String id) {
-        this(parent, id, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        this(parent, id, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,null);
     }
 
     public ReCiterCdkPipelineStack(final Construct parent, final String id, final NestedStackProps props, Cluster reCiterCluster, Repository reCiterEcrRepo, Repository reCiterPubmedEcrRepo, Repository reCiterScopusEcrRepo, Repository reCiterPubManagerEcrRepo, Repository reCiterMachineLearningAnalysisRepo, Topic reCiterTopic, 
     FargateService reCiterPubmedService, FargateService reCiterScopusService, FargateService reCiterService, FargateService reCiterPubManagerService,
-    ISecret reCiterSecret, ApplicationLoadBalancer reCiterAlb, IVpc vpc) {
+    ISecret reCiterSecret, ApplicationLoadBalancer reCiterAlb, IVpc vpc, IFunction notifierLambdaFunction) {
         super(parent, id, props);
 
         //CodeBuild Project for ReCiter-Pubmed
@@ -431,7 +442,104 @@ public class ReCiterCdkPipelineStack extends NestedStack {
             .build());
         reCiterMachineLearningAnalysisRepo.grantPullPush(reCiterMachineLearningAnalysisProject.getRole());
 
+        
+      //CodeBuild Project for ReCiter PubNotifier
+        reCiterPubNotifierCodeBuildProject = new Project(this, "reciter-pubnotifier-codebuild", ProjectProps.builder()
+            .projectName("ReCiter-PubNotifier")
+            .source(Source.gitHub(GitHubSourceProps.builder()
+                .owner(System.getenv("GITHUB_USER"))
+                .repo("ReCiter-PubNotifier")
+                .webhook(false)
+                .reportBuildStatus(false)
+                .build()))
+            .badge(true)
+            .vpc(vpc)
+                .subnetSelection(SubnetSelection.builder()
+                    .onePerAz(true)
+                    .subnetType(SubnetType.PRIVATE_WITH_NAT)
+                    .build())
+            .environment(BuildEnvironment.builder()
+                .buildImage(LinuxBuildImage.AMAZON_LINUX_2_3)
+                .computeType(ComputeType.SMALL)
+                .build())
+            .environment(BuildEnvironment.builder()
+                    .environmentVariables(Map.of(
+                        "DEPLOY_FUNCTION_NAME", BuildEnvironmentVariable.builder()
+                            .value(notifierLambdaFunction.getFunctionName()) // Passed from your Lambda construct
+                            .build(),
+                         "DEPLOY_ALIAS_NAME", BuildEnvironmentVariable.builder()
+                            .value("Live") // This matches the Alias created above
+                            .build()   
+                    ))
+                    .build())
+            .buildSpec(BuildSpec.fromObject(new HashMap<String, Object>() {{
+                put("version", "0.2");
+                put("phases", Map.of(
+                    "install", Map.of("commands", List.of("npm install")),
+                    "build", Map.of("commands", List.of("npm run build")),
+                    "post_build", Map.of("commands", List.of(
+                        "cd dist && zip -r ../Reciter-PubNotifier.zip . && cd ..",
+                        "echo \"Updating Lambda: $DEPLOY_FUNCTION_NAME\"",
+                        "aws lambda update-function-code --function-name \"$DEPLOY_FUNCTION_NAME\" --zip-file fileb://Reciter-PubNotifier.zip"
+                    ))
+                ));
+                put("artifacts", Map.of(
+                    "files", List.of("Reciter-PubNotifier.zip")
+                ));
+            }}))
+            .build());
+        
+      //Roles section
+        IRole buildRole = reCiterPubNotifierCodeBuildProject.getRole();
 
+     // Permission to update the code
+        notifierLambdaFunction.grantInvoke(buildRole);
+     buildRole.addToPrincipalPolicy(PolicyStatement.Builder.create()
+         .actions(List.of("lambda:UpdateFunctionCode", "lambda:PublishVersion", "lambda:UpdateAlias"))
+         .resources(List.of(
+        		 notifierLambdaFunction.getFunctionArn(),
+        		 notifierLambdaFunction.getFunctionArn() + ":*" // Permission for all versions/aliases
+         ))
+         .build());
+        
+     
+     
+      //CodeBuild Project for ReCiter Scoring
+     reCiterScoringCodeBuildProject = Project.Builder.create(this, "reciter-score-build")
+    		    .projectName("ReCiter-Score-Docker-Build")
+    		    .source(Source.gitHub(GitHubSourceProps.builder()
+    		        .owner(System.getenv("GITHUB_USER")) 
+    		        .repo("ReCiter---Scoring")
+    		        .webhook(false)
+    		        .reportBuildStatus(false)
+    		        .build()))
+    		    .environment(BuildEnvironment.builder()
+    		        .buildImage(LinuxBuildImage.AMAZON_LINUX_2_3)
+    		        .privileged(true) // Essential for 'docker build'
+    		        .build())
+    		    .buildSpec(BuildSpec.fromSourceFilename("buildspec.yml"))
+    		    .build();
+        
+	  // Grant permission to pull secrets (Docker Hub & ReCiter Secrets)
+     reCiterScoringCodeBuildProject.addToRolePolicy(PolicyStatement.Builder.create()
+	         .actions(List.of("secretsmanager:GetSecretValue"))
+	         .resources(List.of("*")) // Update with specific secret ARNs for better security
+	         .build());
+	
+	     // Grant permission to push to ECR
+     reCiterScoringCodeBuildProject.addToRolePolicy(PolicyStatement.Builder.create()
+	         .actions(List.of("ecr:GetAuthorizationToken", "ecr:BatchCheckLayerAvailability", 
+	                          "ecr:PutImage", "ecr:InitiateLayerUpload", 
+	                          "ecr:UploadLayerPart", "ecr:CompleteLayerUpload"))
+	         .resources(List.of("*"))
+	         .build());
+	
+	     // Grant permission to update the Lambda code
+     reCiterScoringCodeBuildProject.addToRolePolicy(PolicyStatement.Builder.create()
+	         .actions(List.of("lambda:UpdateFunctionCode"))
+	         .resources(List.of("*"))
+	         .build());
+        
         //ReCiter-Pubmed Pipeline
         final GitHubSourceAction sourceAction = new GitHubSourceAction(GitHubSourceActionProps.builder()
             .actionName("Github_Source")
@@ -647,6 +755,75 @@ public class ReCiterCdkPipelineStack extends NestedStack {
             ))
             .build());
         
+        //Pipeline for ReCiter Publication Notifier
+        final Pipeline reCiterPubNotifierCodePipeline = new Pipeline(this, "reCiterPubNotifierCodePipeline", PipelineProps.builder()
+            .pipelineName("ReCiter-PubNotifier-Prod")
+            .stages(Arrays.asList(
+                StageProps.builder()
+                    .stageName("Source")
+                    .actions(Arrays.asList(new GitHubSourceAction(GitHubSourceActionProps.builder()
+                        .actionName("Github_Source")
+                        .owner(System.getenv("GITHUB_USER"))
+                        .repo("ReCiter-PubNotifier")
+                        .branch("master")
+                        .oauthToken(SecretValue.plainText(System.getenv("GITHUB_PERSONAL_ACCESS_TOKEN")))
+                        .output(reCiterPubNofifierSourceOutput)
+                        .build())))
+                    .build(),
+                StageProps.builder()
+                    .stageName("Approve")
+                    .actions(Arrays.asList(new ManualApprovalAction(ManualApprovalActionProps.builder()
+                        .actionName("Approve")
+                        .notificationTopic(reCiterTopic)
+                        .build())))
+                    .build(),
+                StageProps.builder()
+                    .stageName("Build")
+                    .actions(Arrays.asList(new CodeBuildAction(CodeBuildActionProps.builder()
+                        .actionName("CodeBuild")
+                        .project(reCiterPubNotifierCodeBuildProject)
+                        .input(reCiterPubNofifierSourceOutput)
+                        .outputs(Arrays.asList(reCiterPubNotifierbuildOutput))
+                        .build())))
+                    .build()
+            ))
+            .build());
+        
+        
+        //Pipeline for ReCiter Scoring
+        final Pipeline reCiterScoringCodePipeline = new Pipeline(this, "reCiterScoringCodePipeline", PipelineProps.builder()
+            .pipelineName("Reciter-Scoring-Prod")
+            .stages(Arrays.asList(
+                StageProps.builder()
+                    .stageName("Source")
+                    .actions(Arrays.asList(new GitHubSourceAction(GitHubSourceActionProps.builder()
+                        .actionName("Github_Source")
+                        .owner(System.getenv("GITHUB_USER"))
+                        .repo("ReCiter---Scoring")
+                        .branch("master")
+                        .oauthToken(SecretValue.plainText(System.getenv("GITHUB_PERSONAL_ACCESS_TOKEN")))
+                        .output(reCiterScoringSourceOutput)
+                        .build())))
+                    .build(),
+                StageProps.builder()
+                    .stageName("Approve")
+                    .actions(Arrays.asList(new ManualApprovalAction(ManualApprovalActionProps.builder()
+                        .actionName("Approve")
+                        .notificationTopic(reCiterTopic)
+                        .build())))
+                    .build(),
+                StageProps.builder()
+                    .stageName("Build")
+                    .actions(Arrays.asList(new CodeBuildAction(CodeBuildActionProps.builder()
+                        .actionName("CodeBuild")
+                        .project(reCiterScoringCodeBuildProject)
+                        .input(reCiterScoringSourceOutput)
+                        .outputs(Arrays.asList(reCiterScoringbuildOutput))
+                        .build())))
+                    .build()
+            ))
+            .build());
+
     }
 
     public Project getPubmedCodeBuildProject() {
@@ -660,5 +837,11 @@ public class ReCiterCdkPipelineStack extends NestedStack {
     }
     public Project getReCiterPubManagerCodeBuildProject() {
         return this.reCiterPubManagerCodebuildProject;
+    }
+    public Project getReCiterPubNotifierCodeBuildProject() {
+        return this.reCiterPubNotifierCodeBuildProject;
+    }
+    public Project getReCiterScoringCodeBuildProject() {
+        return this.reCiterScoringCodeBuildProject;
     }
 }

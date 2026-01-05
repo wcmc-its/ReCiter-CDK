@@ -12,7 +12,6 @@ public class ReCiterCdkApp {
     static Environment makeEnv(String account, String region) {
         account = (account == null) ? System.getenv("CDK_DEFAULT_ACCOUNT") : account;
         region = (region == null) ? System.getenv("CDK_DEFAULT_REGION") : region;
-
         return Environment.builder()
                 .account(account)
                 .region(region)
@@ -49,7 +48,6 @@ public class ReCiterCdkApp {
                 "SCOPUS_INST_TOKEN: If INLCUDE_SCOPUS variable is true then this needs to be set\n");
                 System.exit(1);
         }
-
         new ReCiterCdkStack(app, "ReCiterCdkStack", StackProps.builder()
                 // If you don't specify 'env', this stack will be environment-agnostic.
                 // Account/Region-dependent features and context lookups will not work,
@@ -75,12 +73,12 @@ public class ReCiterCdkApp {
 
                 // For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html
                 .analyticsReporting(true)
-                .description("This stack is the master stack that will build VPC, ECR, ECS, WAF, SecretsManager, CodePipeline, Codebuild for ReCiter and its components.")
+                .description("This stack is the master stack that will build VPC, ECR, ECS, WAF, SecretsManager, CodePipeline, Codebuild,Lambda for ReCiter and its components.")
                 .terminationProtection(false)
                 .stackName("ReCiterCdkMasterStack")
                 .tags(new HashMap<String, String>(){{
                         put("application", "ReCiter");
-                        put("cdk-maintainer", "Sarbajit Dutta - szd2013@med.cornell.edu");
+                        put("cdk-maintainer", "Paul Albert - paa2013@med.cornell.edu");
                 }})
                 .env(envReCiter)
                 .build());

@@ -48,6 +48,13 @@ public class ReCiterCdkStack extends Stack {
         reCiterCDKECSStack.addDependency(reCiterCDKVPCStack, "ECS Stack is dependent on VPC");
         reCiterCDKECSStack.addDependency(reCiterCDKECRStack, "ECR repo is needed for ECS Tasks");
         
+        ReCiterCdkLambdaStack reciterCdkLamdaStack = new ReCiterCdkLambdaStack(this, "reciterCdkLambdaStack", NestedStackProps.builder()
+	            .removalPolicy(RemovalPolicy.DESTROY)
+	            .build(), 
+	            reCiterCDKVPCStack.getVpc(), reCiterCDKVPCStack.getPrivateSubnetGroup(), reCiterCDKVPCStack.getPublicSubnetGroup());
+        NestedStack.isNestedStack(reciterCdkLamdaStack);    
+        reciterCdkLamdaStack.addDependency(reCiterCDKVPCStack, "Lambda is dependent on VPC Stack");
+
 
         ReCiterCdkPipelineStack reCiterCdkPipelineStack = new ReCiterCdkPipelineStack(this, "reCiterCdkCodeBuildStack", NestedStackProps.builder()
             .removalPolicy(RemovalPolicy.DESTROY)
@@ -55,7 +62,8 @@ public class ReCiterCdkStack extends Stack {
             reCiterCDKECSStack.getCluster(), reCiterCDKECRStack.getReCiterEcrRepo(), reCiterCDKECRStack.getReCiterPubmedEcrRepo(), reCiterCDKECRStack.getReCiterScopusEcrRepo(), reCiterCDKECRStack.getReCiterPubManagerEcrRepo(), reCiterCDKECRStack.getReCiterMachineLearningAnalysisEcrRepo(),
             reCiterCDKECSStack.getReCiterTopic(), 
             reCiterCDKECSStack.getReCiterPubmedService(), reCiterCDKECSStack.getReCiterScopusService(), reCiterCDKECSStack.getReCiterService(), reCiterCDKECSStack.getReCiterPubManagerService(),
-            reCiterCdkSecretsManagerStack.getReCiterSecret(), reCiterCDKECSStack.getAlb(), reCiterCDKVPCStack.getVpc());
+            reCiterCdkSecretsManagerStack.getReCiterSecret(), reCiterCDKECSStack.getAlb(), reCiterCDKVPCStack.getVpc(),
+            reciterCdkLamdaStack.getReCiterNotifierLambdaFunction());
         NestedStack.isNestedStack(reCiterCdkPipelineStack);
         reCiterCdkPipelineStack.addDependency(reCiterCDKECSStack);
 
@@ -66,5 +74,8 @@ public class ReCiterCdkStack extends Stack {
         NestedStack.isNestedStack(reCiterCdkWAFStack);
         reCiterCdkWAFStack.addDependency(reCiterCDKECSStack, "WAF dependent on ALB");
         
+        
+		
+		     
     }
 }
