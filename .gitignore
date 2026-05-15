@@ -11,3 +11,8 @@ target
 .cdk.staging
 cdk.out
 cdk.context.json
+
+# Claude Code local artifacts
+CLAUDE.md
+CLAUDE.local.md
+.claude/

@@ -41,7 +41,7 @@ public class ReCiterCdkStack extends Stack {
             .removalPolicy(RemovalPolicy.DESTROY)
             .build(),
             reCiterCDKVPCStack.getVpc(), reCiterCdkSecretsManagerStack.getReCiterSecret(), reCiterCdkSecretsManagerStack.getReCiterPubmedSecret(), reCiterCdkSecretsManagerStack.getReCiterScopusSecret()
-            , reCiterCDKECRStack.getReCiterEcrRepo(), reCiterCDKECRStack.getReCiterPubmedEcrRepo(), reCiterCDKECRStack.getReCiterScopusEcrRepo(), reCiterCDKECRStack.getReCiterPubManagerEcrRepo(), reCiterCDKECRStack.getReCiterMachineLearningAnalysisEcrRepo(), reCiterCdkRDSStack.getReciterDb());
+            , reCiterCDKECRStack.getReCiterEcrRepo(), reCiterCDKECRStack.getReCiterPubmedEcrRepo(), reCiterCDKECRStack.getReCiterScopusEcrRepo(), reCiterCDKECRStack.getReCiterPubManagerEcrRepo(), reCiterCDKECRStack.getReCiterMachineLearningAnalysisEcrRepo(), reCiterCDKECRStack.getReciterAIDailyEnrichmentEcrRepo(), reCiterCdkSecretsManagerStack.getReciterAIOpenAISecret(), reCiterCdkSecretsManagerStack.getReciterAITeamsWebhookSecret(), reCiterCdkRDSStack.getReciterDb());
         NestedStack.isNestedStack(reCiterCDKECSStack);
         reCiterCDKECSStack.addDependency(reCiterCdkRDSStack, "RDS is needed for Scheduled task");
         reCiterCDKECSStack.addDependency(reCiterCdkSecretsManagerStack, "ECS Stack is dependent on SecretsManager Stack");
