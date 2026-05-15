@@ -21,6 +21,7 @@ public class ReCiterCDKECRStack extends NestedStack {
     private Repository reciterScopusRepo;
     private final Repository reciterPubManagerRepo;
     private final Repository reciterMachineLearningAnalysisRepo;
+    private final Repository reciterAIDailyEnrichmentRepo;
     
     public ReCiterCDKECRStack(final Construct parent, final String id) {
         this(parent, id, null);
@@ -102,6 +103,20 @@ public class ReCiterCDKECRStack extends NestedStack {
             .imageTagMutability(TagMutability.MUTABLE)
             .build());
 
+        //ReciterAI Daily Enrichment ECR repo
+        reciterAIDailyEnrichmentRepo = new Repository(this, "reciterAIDailyEnrichmentRepo", RepositoryProps.builder()
+            .imageScanOnPush(true)
+            .repositoryName("reciter/ai-daily-enrichment")
+            .removalPolicy(RemovalPolicy.DESTROY)
+            .lifecycleRules(Arrays.asList(LifecycleRule.builder()
+                .description("remove old images")
+                .maxImageCount(10)
+                .rulePriority(1)
+                .tagStatus(TagStatus.ANY)
+                .build()))
+            .imageTagMutability(TagMutability.MUTABLE)
+            .build());
+
         //Tagging for all Resources
         Tags.of(this).add("application", "ReCiter");
         Tags.of(this).add("stack-id", ReCiterCDKECRStack.of(this).getStackId());
@@ -138,6 +153,12 @@ public class ReCiterCDKECRStack extends NestedStack {
             .exportName("ecrRepoUrlReCiterMachineLearningAnalysis")
             .value(reciterMachineLearningAnalysisRepo.getRepositoryUri())
             .build();
+
+        CfnOutput.Builder.create(this, "ecrRepoUrlReciterAIDailyEnrichment")
+            .description("ECR Repo url for ReciterAI-Daily-Enrichment")
+            .exportName("ecrRepoUrlReciterAIDailyEnrichment")
+            .value(reciterAIDailyEnrichmentRepo.getRepositoryUri())
+            .build();
     }
 
     public Repository getReCiterEcrRepo() {
@@ -154,5 +175,8 @@ public class ReCiterCDKECRStack extends NestedStack {
     }
     public Repository getReCiterMachineLearningAnalysisEcrRepo() {
         return this.reciterMachineLearningAnalysisRepo;
+    }
+    public Repository getReciterAIDailyEnrichmentEcrRepo() {
+        return this.reciterAIDailyEnrichmentRepo;
     }
 }

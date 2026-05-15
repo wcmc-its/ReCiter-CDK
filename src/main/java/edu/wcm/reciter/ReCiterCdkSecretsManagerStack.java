@@ -12,10 +12,12 @@ import software.amazon.awscdk.services.secretsmanager.SecretProps;
 import software.amazon.awscdk.services.secretsmanager.SecretStringGenerator;
 
 public class ReCiterCdkSecretsManagerStack extends NestedStack {
-    
+
     private final ISecret reciterSecret;
     private final ISecret reciterPubmedSecret;
     private ISecret reciterScopusSecret;
+    private final ISecret reciterAIOpenAISecret;
+    private final ISecret reciterAITeamsWebhookSecret;
 
     public ReCiterCdkSecretsManagerStack(final Construct parent, final String id) {
         this(parent, id, null);
@@ -57,14 +59,32 @@ public class ReCiterCdkSecretsManagerStack extends NestedStack {
                 .removalPolicy(RemovalPolicy.DESTROY)
                 .generateSecretString(SecretStringGenerator.builder()
                     .secretStringTemplate(new JSONObject()
-                        .put("SCOPUS_API_KEY", System.getenv("SCOPUS_API_KEY")) 
-                        .put("SCOPUS_INST_TOKEN", System.getenv("SCOPUS_INST_TOKEN"))                    
+                        .put("SCOPUS_API_KEY", System.getenv("SCOPUS_API_KEY"))
+                        .put("SCOPUS_INST_TOKEN", System.getenv("SCOPUS_INST_TOKEN"))
                     .toString())
                     .generateStringKey("password")
                     .build())
                 .secretName("cdk-reciter-scopus-secrets")
                 .build());
         }
+
+        // ReciterAI daily-enrichment secrets. These are single-value secrets
+        // (raw API key, raw webhook URL) — not JSON envelopes — so the operator
+        // can update with `aws secretsmanager update-secret --secret-string '<raw>'`
+        // without worrying about JSON quoting. CDK auto-generates a random initial
+        // value on stack create; the operator overwrites it post-deploy. The real
+        // value never lives in CDK source or in CloudFormation events.
+        reciterAIOpenAISecret = new Secret(this, "reciterAIOpenAISecret", SecretProps.builder()
+            .description("OpenAI API key for the ReciterAI daily-enrichment job. Populate post-deploy with: aws secretsmanager update-secret --secret-id reciterai/openai-api-key --secret-string '<sk-...>'")
+            .removalPolicy(RemovalPolicy.DESTROY)
+            .secretName("reciterai/openai-api-key")
+            .build());
+
+        reciterAITeamsWebhookSecret = new Secret(this, "reciterAITeamsWebhookSecret", SecretProps.builder()
+            .description("Microsoft Teams Incoming Webhook URL for ReciterAI alerts. Populate post-deploy with: aws secretsmanager update-secret --secret-id reciterai/teams-webhook-url --secret-string '<https://...>'")
+            .removalPolicy(RemovalPolicy.DESTROY)
+            .secretName("reciterai/teams-webhook-url")
+            .build());
     }
 
     public ISecret getReCiterSecret() {
@@ -77,5 +97,13 @@ public class ReCiterCdkSecretsManagerStack extends NestedStack {
 
     public ISecret getReCiterScopusSecret() {
         return this.reciterScopusSecret;
+    }
+
+    public ISecret getReciterAIOpenAISecret() {
+        return this.reciterAIOpenAISecret;
+    }
+
+    public ISecret getReciterAITeamsWebhookSecret() {
+        return this.reciterAITeamsWebhookSecret;
     }
 }

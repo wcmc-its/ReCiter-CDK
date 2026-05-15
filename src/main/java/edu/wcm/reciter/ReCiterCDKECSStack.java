@@ -96,13 +96,15 @@ public class ReCiterCDKECSStack extends NestedStack {
     private FargateService reCiterScopusService;
     private FargateService reCiterPubManagerService;
     private ScheduledFargateTask reCiterMachineLearningFargateTask;
-    
-    
+    private FargateTaskDefinition reciterAIDailyEnrichmentTaskDef;
+    private SecurityGroup reciterAIDailyEnrichmentSg;
+
+
     public ReCiterCDKECSStack(final Construct parent, final String id) {
-        this(parent, id, null, null, null, null, null, null, null, null, null, null, null);
+        this(parent, id, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
     }
 
-    public ReCiterCDKECSStack(final Construct parent, final String id, final NestedStackProps props, IVpc vpc, ISecret reCiterSecret, ISecret reciterPubmedSecret, ISecret reciterScopusSecret, Repository reCiterEcrRepo, Repository reCiterPubmedEcrRep, Repository reCiterScopusEcrRepo, Repository reCiterPubManagerEcrRepo, Repository reCiterMachineLearningAnalysisRepo, DatabaseInstance reciterDb) {
+    public ReCiterCDKECSStack(final Construct parent, final String id, final NestedStackProps props, IVpc vpc, ISecret reCiterSecret, ISecret reciterPubmedSecret, ISecret reciterScopusSecret, Repository reCiterEcrRepo, Repository reCiterPubmedEcrRep, Repository reCiterScopusEcrRepo, Repository reCiterPubManagerEcrRepo, Repository reCiterMachineLearningAnalysisRepo, Repository reciterAIDailyEnrichmentRepo, ISecret reciterAIOpenAISecret, ISecret reciterAITeamsWebhookSecret, DatabaseInstance reciterDb) {
         super(parent, id, props);
 
         final SecurityGroup albSg = new SecurityGroup(this, "reciter-cdk-alb-sg", SecurityGroupProps.builder().allowAllOutbound(true)
@@ -915,6 +917,90 @@ public class ReCiterCDKECSStack extends NestedStack {
         reCiterMachineLearningAnalysisRepo.grantPull(reCiterMachineLearningFargateTask.getTaskDefinition().obtainExecutionRole());
         //reciterDb.getConnections().allowFrom(reciterClusterSg, Port.tcp(3306), "Allow connections to database from Scheduled Task");
 
+        // -------------------------------------------------------------------------
+        // ReciterAI daily enrichment task (#37 step 2 PR A).
+        //
+        // PR A intentionally defines only the task definition + IAM + container +
+        // log group. No EventBridge rule and no ScheduledFargateTask wrapper —
+        // operator validates via `aws ecs run-task` first. PR B layers two
+        // EventBridge cron rules over the same task definition (daily delta at
+        // 04:00 UTC; annual rescore once a year with --full).
+        // -------------------------------------------------------------------------
+
+        reciterAIDailyEnrichmentTaskDef = new FargateTaskDefinition(this, "reciterAIDailyEnrichmentTaskDef", FargateTaskDefinitionProps.builder()
+            .cpu(512)
+            .memoryLimitMiB(2048)
+            .build());
+
+        reciterAIDailyEnrichmentRepo.grantPull(reciterAIDailyEnrichmentTaskDef.obtainExecutionRole());
+
+        reciterAIDailyEnrichmentTaskDef.addContainer("reciterai-daily-enrichment", ContainerDefinitionOptions.builder()
+            .image(ContainerImage.fromEcrRepository(reciterAIDailyEnrichmentRepo, "latest"))
+            .containerName("reciterai-daily-enrichment")
+            .logging(new AwsLogDriver(AwsLogDriverProps.builder()
+                .logGroup(new LogGroup(this, "reciterAIDailyEnrichmentLogGroup", LogGroupProps.builder()
+                    .logGroupName("/ecs/reciterai/daily-enrichment")
+                    .removalPolicy(RemovalPolicy.DESTROY)
+                    .retention(RetentionDays.ONE_MONTH)
+                    .build()))
+                .streamPrefix("reciterai-daily-enrichment")
+                .build()))
+            .environment(new HashMap<String, String>(){{
+                put("DB_HOST", reciterDb.getDbInstanceEndpointAddress());
+                put("DB_USERNAME", "admin");
+                put("DB_NAME", "reciter");
+                put("RECITERAI_ALERT_MENTION_UPN", "paa2013@med.cornell.edu");
+                put("RECITERAI_ALERT_MENTION_NAME", "Paul Albert");
+            }})
+            .secrets(new HashMap<String, Secret>(){{
+                put("DB_PASSWORD", Secret.fromSecretsManager(reciterDb.getSecret(), "password"));
+                put("AWS_DEFAULT_REGION", Secret.fromSecretsManager(reCiterSecret, "AWS_REGION"));
+                put("OPENAI_API_KEY", Secret.fromSecretsManager(reciterAIOpenAISecret));
+                put("RECITERAI_TEAMS_WEBHOOK_URL", Secret.fromSecretsManager(reciterAITeamsWebhookSecret));
+            }})
+            .build());
+
+        // Task role IAM — scoped to exactly what the step-2 daily_job actually
+        // calls (`utils/dynamodb_helpers.py:26` → TABLE_NAME = "reciterai";
+        // `pipeline_enrichment/watermark.py` → get_item + update_item only).
+        // Step 3 will extend this with Bedrock + STAGE# write paths when the
+        // topic-scoring + DDB-dual-write code lands; do not pre-grant scope
+        // that the current code does not exercise.
+        reciterAIDailyEnrichmentTaskDef.addToTaskRolePolicy(new PolicyStatement(PolicyStatementProps.builder()
+            .sid("ReciterAIWatermarkAccess")
+            .effect(Effect.ALLOW)
+            .actions(Arrays.asList(
+                "dynamodb:GetItem",
+                "dynamodb:UpdateItem"))
+            .resources(Arrays.asList(
+                "arn:aws:dynamodb:" + ReCiterCDKECSStack.of(this).getRegion() + ":" + ReCiterCDKECSStack.of(this).getAccount() + ":table/reciterai"))
+            .build()));
+
+        // Security group: outbound only (no inbound — task is operator-triggered,
+        // not network-addressable). Matches the pattern reCiterMachineLearningFargateTask
+        // relies on for outbound Bedrock + OpenAI + RDS connectivity.
+        reciterAIDailyEnrichmentSg = new SecurityGroup(this, "reciterAIDailyEnrichmentSg", SecurityGroupProps.builder()
+            .allowAllOutbound(true)
+            .description("Egress-only SG for ReciterAI daily-enrichment Fargate task")
+            .securityGroupName("reciterai-daily-enrichment-sg")
+            .vpc(vpc)
+            .build());
+
+        // Allow the daily-enrichment task to reach the ReCiter RDS on 3306.
+        reciterDb.getConnections().allowFrom(reciterAIDailyEnrichmentSg, Port.tcp(3306), "Allow ReciterAI daily-enrichment task to reach RDS");
+
+        CfnOutput.Builder.create(this, "reciterAIDailyEnrichmentTaskDefArn")
+            .description("Task definition ARN for the ReciterAI daily-enrichment task (use with `aws ecs run-task`).")
+            .exportName("reciterAIDailyEnrichmentTaskDefArn")
+            .value(reciterAIDailyEnrichmentTaskDef.getTaskDefinitionArn())
+            .build();
+
+        CfnOutput.Builder.create(this, "reciterAIDailyEnrichmentSgId")
+            .description("Security group ID to pass to `aws ecs run-task` network configuration.")
+            .exportName("reciterAIDailyEnrichmentSgId")
+            .value(reciterAIDailyEnrichmentSg.getSecurityGroupId())
+            .build();
+
         //Tagging for all Resources
         Tags.of(this).add("application", "reciter");
         Tags.of(this).add("stack-id", ReCiterCDKECSStack.of(this).getStackId());
@@ -973,6 +1059,14 @@ public class ReCiterCDKECSStack extends NestedStack {
 
     public FargateService getReCiterPubManagerService() {
         return this.reCiterPubManagerService;
+    }
+
+    public FargateTaskDefinition getReciterAIDailyEnrichmentTaskDef() {
+        return this.reciterAIDailyEnrichmentTaskDef;
+    }
+
+    public SecurityGroup getReciterAIDailyEnrichmentSg() {
+        return this.reciterAIDailyEnrichmentSg;
     }
 
 }
